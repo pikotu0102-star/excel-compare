@@ -292,120 +292,36 @@
     return { added, removed, changed };
   }
 
-  function generateAnalysis(diff, headers1, headers2) {
+  function callAI(diff, headers1, headers2) {
     const total = diff.added.length + diff.removed.length + diff.changed.length;
+    let summary = '';
 
-    // ── 1. 整體差異摘要 ──────────────────────────────────────
-    let summaryLine = '';
-    if (total === 0) {
-      summaryLine = '兩份檔案內容完全相同，未發現任何差異。';
-    } else {
-      const parts = [];
-      if (diff.added.length)   parts.push(`新增 ${diff.added.length} 行`);
-      if (diff.removed.length) parts.push(`刪除 ${diff.removed.length} 行`);
-      if (diff.changed.length) parts.push(`修改 ${diff.changed.length} 行`);
-      summaryLine = `共發現 ${total} 處差異，包含 ${parts.join('、')}。`;
-    }
+    summary += '📊 整體差異摘要\n';
+    summary += `兩個檔案共有 ${total} 處差異：新增 ${diff.added.length} 行、刪除 ${diff.removed.length} 行、修改 ${diff.changed.length} 行。\n\n`;
 
-    // ── 2. 主要差異重點 ──────────────────────────────────────
-    const bullets = [];
+    summary += '🔑 主要差異重點\n';
+    if (diff.added.length > 0) summary += `• 檔案 B 比檔案 A 多了 ${diff.added.length} 行新資料\n`;
+    if (diff.removed.length > 0) summary += `• 檔案 B 比檔案 A 少了 ${diff.removed.length} 行資料\n`;
+    if (diff.changed.length > 0) summary += `• 有 ${diff.changed.length} 行的內容被修改\n`;
+    if (total === 0) summary += '• 兩個檔案內容完全相同\n';
+    summary += '\n';
 
-    if (diff.added.length > 0) {
-      const rows = diff.added.slice(0, 3).map(r => `第 ${r.row} 行`).join('、');
-      bullets.push(`• 新增 ${diff.added.length} 筆資料（如 ${rows}${diff.added.length > 3 ? ' 等' : ''}）`);
-    }
-
-    if (diff.removed.length > 0) {
-      const rows = diff.removed.slice(0, 3).map(r => `第 ${r.row} 行`).join('、');
-      bullets.push(`• 刪除 ${diff.removed.length} 筆資料（如 ${rows}${diff.removed.length > 3 ? ' 等' : ''}）`);
-    }
-
+    summary += '⚠️ 需要特別注意\n';
     if (diff.changed.length > 0) {
-      // 統計哪些欄位最常被修改
-      const colCount = {};
-      diff.changed.forEach(r => r.changes.forEach(c => { colCount[c.col] = (colCount[c.col] || 0) + 1; }));
-      const topCols = Object.entries(colCount).sort((a, b) => b[1] - a[1]).slice(0, 3);
-      const colDesc = topCols.map(([col, cnt]) => {
-        const header = (headers1[col - 1] || headers2[col - 1]);
-        return header ? `「${header}」(${cnt} 次)` : `欄位 ${col}(${cnt} 次)`;
-      }).join('、');
-      bullets.push(`• 修改 ${diff.changed.length} 筆資料，異動最多的欄位：${colDesc}`);
-
-      // 舉出前 3 筆修改範例
-      diff.changed.slice(0, 3).forEach(r => {
-        const desc = r.changes.slice(0, 2).map(c => {
-          const header = (headers1[c.col - 1] || headers2[c.col - 1]);
-          const colLabel = header ? `「${header}」` : `欄位 ${c.col}`;
-          return `${colLabel}：${c.old || '(空白)'} → ${c.new || '(空白)'}`;
-        }).join('；');
-        bullets.push(`  ‣ 第 ${r.row} 行　${desc}${r.changes.length > 2 ? ` 等共 ${r.changes.length} 欄` : ''}`);
+      diff.changed.slice(0,3).forEach(row => {
+        row.changes.forEach(c => {
+          summary += `• 第 ${row.row} 行 欄位${c.col}：「${c.old}」→「${c.new}」\n`;
+        });
       });
     }
+    if (total === 0) summary += '• 無異常\n';
+    summary += '\n';
 
-    if (total === 0) {
-      bullets.push('• 所有欄位與資料均一致，無需額外處理。');
-    }
+    summary += '💡 建議\n';
+    if (total > 0) summary += '• 請仔細核對差異項目，確認修改是否符合預期。\n';
+    else summary += '• 兩份檔案一致，可以放心使用。\n';
 
-    // ── 3. 需要特別注意的項目 ────────────────────────────────
-    const warnings = [];
-
-    if (diff.removed.length > 0) {
-      warnings.push(`• 檔案 B 中有 ${diff.removed.length} 行資料已被移除，請確認是否為刻意刪除，以免造成資料遺失。`);
-    }
-
-    if (diff.changed.length > 0) {
-      const highChangeCols = {};
-      diff.changed.forEach(r => r.changes.forEach(c => { highChangeCols[c.col] = (highChangeCols[c.col] || 0) + 1; }));
-      const dominated = Object.entries(highChangeCols).filter(([, cnt]) => cnt >= diff.changed.length * 0.5);
-      if (dominated.length > 0) {
-        dominated.forEach(([col, cnt]) => {
-          const header = (headers1[col - 1] || headers2[col - 1]);
-          const label = header ? `「${header}」` : `欄位 ${col}`;
-          warnings.push(`• 欄位 ${label} 有超過半數的列都被修改（共 ${cnt} 筆），可能是欄位格式或批次更新，請重點複核。`);
-        });
-      }
-    }
-
-    if (diff.added.length > 20 || diff.removed.length > 20) {
-      warnings.push('• 本次差異量較大，建議逐一核對新增／刪除的資料，確保無誤。');
-    }
-
-    if (total === 0) {
-      warnings.push('• 無需特別注意，兩份檔案完全一致。');
-    }
-
-    // ── 4. 建議 ──────────────────────────────────────────────
-    const suggestions = [];
-
-    if (diff.added.length > 0) {
-      suggestions.push('• 請確認新增資料的來源與正確性，並同步更新相關系統或報表。');
-    }
-    if (diff.removed.length > 0) {
-      suggestions.push('• 建議保留刪除前的備份，或在備註欄位記錄刪除原因，以便日後查詢。');
-    }
-    if (diff.changed.length > 0) {
-      suggestions.push('• 修改的資料建議由原始負責人員再次確認，確保異動符合預期。');
-    }
-    if (total > 0) {
-      suggestions.push('• 完成複核後，可將確認結果標記於檔案中，作為變更紀錄留存。');
-    } else {
-      suggestions.push('• 兩份檔案已通過比對，可直接使用，無需額外修正。');
-    }
-
-    // ── 組合輸出 ─────────────────────────────────────────────
-    return [
-      '📊 整體差異摘要',
-      summaryLine,
-      '',
-      '🔑 主要差異重點',
-      bullets.join('\n'),
-      '',
-      '⚠️ 需要特別注意的項目',
-      warnings.join('\n'),
-      '',
-      '💡 建議',
-      suggestions.join('\n'),
-    ].join('\n');
+    return Promise.resolve(summary);
   }
 
   async function startCompare() {
@@ -426,7 +342,7 @@
 
       // 本地智慧分析
       const aiEl = document.getElementById('aiContent');
-      const summary = generateAnalysis(diff, headers1, headers2);
+      const summary = await callAI(diff, headers1, headers2);
       aiEl.innerHTML = `<div class="ai-summary">${summary}</div>`;
     } catch(err) {
       document.getElementById('loadingEl').classList.add('hidden');
