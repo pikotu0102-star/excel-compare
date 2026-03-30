@@ -3,329 +3,265 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Excel 智慧比對工具</title>
+  <title>Excel 財務報價比對工具</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Noto Sans TC', sans-serif;
-      background: #0f1117;
-      color: #e2e8f0;
-      min-height: 100vh;
-    }
-    .app {
-      min-height: 100vh;
-      background: linear-gradient(135deg, #0f1117 0%, #1a1f2e 50%, #0f1117 100%);
-      padding: 32px 24px;
-    }
-    .header { text-align: center; margin-bottom: 40px; }
+    body { font-family: 'Noto Sans TC', sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+    .app { min-height: 100vh; background: linear-gradient(135deg,#0f1117 0%,#1a1f2e 50%,#0f1117 100%); padding: 32px 24px; }
+
+    /* ── Header ───────────────────────────────────── */
+    .header { text-align: center; margin-bottom: 36px; }
     .header h1 {
-      font-size: 2rem;
-      font-weight: 700;
-      background: linear-gradient(135deg, #60a5fa, #a78bfa, #34d399);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin-bottom: 8px;
+      font-size: 2rem; font-weight: 700;
+      background: linear-gradient(135deg,#60a5fa,#a78bfa,#34d399);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 6px;
     }
-    .header p { color: #64748b; font-size: 0.9rem; }
+    .header p { color: #64748b; font-size: 0.88rem; }
+
+    /* ── Upload ───────────────────────────────────── */
     .upload-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      margin-bottom: 24px;
-      max-width: 900px;
-      margin-left: auto;
-      margin-right: auto;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+      max-width: 900px; margin: 0 auto 20px;
     }
     .upload-zone {
-      border: 2px dashed #2d3748;
-      border-radius: 16px;
-      padding: 32px 24px;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      background: rgba(255,255,255,0.02);
+      border: 2px dashed #2d3748; border-radius: 16px; padding: 28px 20px;
+      text-align: center; cursor: pointer; transition: all .3s;
+      background: rgba(255,255,255,.02);
     }
-    .upload-zone:hover, .upload-zone.drag-over {
-      border-color: #60a5fa;
-      background: rgba(96,165,250,0.05);
+    .upload-zone:hover, .upload-zone.drag-over { border-color: #60a5fa; background: rgba(96,165,250,.05); }
+    .upload-zone.loaded                        { border-color: #34d399; background: rgba(52,211,153,.05); }
+    .upload-icon { font-size: 2.2rem; margin-bottom: 10px; }
+    .upload-label { font-size: .82rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 3px; }
+    .upload-name  { font-size: .8rem; color: #34d399; font-family: 'JetBrains Mono',monospace; margin-top: 6px; word-break: break-all; }
+    .upload-hint  { font-size: .78rem; color: #475569; margin-top: 4px; }
+
+    /* ── Sheet selector ───────────────────────────── */
+    .sheet-selector {
+      max-width: 900px; margin: 0 auto 20px;
+      background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07);
+      border-radius: 14px; padding: 20px 24px;
     }
-    .upload-zone.loaded {
-      border-color: #34d399;
-      background: rgba(52,211,153,0.05);
+    .sheet-selector label { font-size: .85rem; color: #94a3b8; font-weight: 600; display: block; margin-bottom: 10px; }
+    .sheet-select {
+      width: 100%; padding: 10px 14px; border-radius: 10px;
+      background: #1a1f2e; border: 1px solid #2d3748; color: #e2e8f0;
+      font-family: 'Noto Sans TC',sans-serif; font-size: .9rem; cursor: pointer;
+      appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 14px center;
     }
-    .upload-icon { font-size: 2.5rem; margin-bottom: 12px; }
-    .upload-label {
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: #94a3b8;
-      margin-bottom: 4px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+    .sheet-select:focus { outline: none; border-color: #60a5fa; }
+
+    /* ── Sheet summary chips ──────────────────────── */
+    .sheet-summary { max-width: 900px; margin: 0 auto 20px; }
+    .sheet-summary-inner {
+      background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07);
+      border-radius: 14px; padding: 18px 22px; display: flex; flex-direction: column; gap: 12px;
     }
-    .upload-name {
-      font-size: 0.85rem;
-      color: #34d399;
-      font-family: 'JetBrains Mono', monospace;
-      margin-top: 8px;
-      word-break: break-all;
+    .sheet-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .sheet-group-label { font-size: .78rem; color: #64748b; font-weight: 600; min-width: 160px; }
+    .sheet-chip {
+      padding: 3px 12px; border-radius: 20px; font-size: .76rem;
+      font-family: 'JetBrains Mono',monospace; font-weight: 600; white-space: nowrap;
     }
-    .upload-hint { font-size: 0.8rem; color: #475569; margin-top: 4px; }
+    .chip-common { background: rgba(139,92,246,.18); color: #a78bfa; }
+    .chip-a-only { background: rgba(248,113,113,.18); color: #f87171; }
+    .chip-b-only { background: rgba(52,211,153,.18); color: #34d399; }
+    .sheet-note  { font-size: .8rem; padding: 6px 12px; border-radius: 8px; }
+    .sheet-note-red   { background: rgba(248,113,113,.1); color: #f87171; }
+    .sheet-note-green { background: rgba(52,211,153,.1);  color: #34d399; }
+
+    /* ── Compare button ───────────────────────────── */
     .compare-btn {
-      display: block;
-      margin: 0 auto 32px;
-      padding: 14px 48px;
-      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-      color: white;
-      border: none;
-      border-radius: 50px;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      font-family: 'Noto Sans TC', sans-serif;
+      display: block; margin: 0 auto 32px; padding: 13px 48px;
+      background: linear-gradient(135deg,#3b82f6,#8b5cf6); color: white;
+      border: none; border-radius: 50px; font-size: 1rem; font-weight: 600;
+      cursor: pointer; transition: all .3s; font-family: 'Noto Sans TC',sans-serif;
     }
-    .compare-btn:hover:not(:disabled) {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(139,92,246,0.4);
-    }
-    .compare-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .results { max-width: 1600px; margin: 0 auto; }
-    .section {
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 16px;
-      padding: 24px;
-      margin-bottom: 20px;
-    }
-    .section-title {
-      font-size: 1rem;
-      font-weight: 700;
-      margin-bottom: 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 2px 10px;
-      border-radius: 20px;
-      font-size: 0.75rem;
-      font-weight: 600;
-    }
-    .badge-added  { background: rgba(52,211,153,0.15);  color: #34d399; }
-    .badge-removed{ background: rgba(248,113,113,0.15); color: #f87171; }
-    .badge-changed{ background: rgba(251,191,36,0.15);  color: #fbbf24; }
-    .badge-ai     { background: rgba(139,92,246,0.15);  color: #a78bfa; }
-    .ai-summary {
-      line-height: 1.9;
-      color: #cbd5e1;
-      white-space: pre-wrap;
-      font-size: 0.9rem;
-    }
+    .compare-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(139,92,246,.4); }
+    .compare-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ── Loading ──────────────────────────────────── */
     .loading { text-align: center; padding: 32px; color: #64748b; }
     .loading-spinner {
-      display: inline-block;
-      width: 32px; height: 32px;
-      border: 3px solid rgba(139,92,246,0.3);
-      border-top-color: #8b5cf6;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin-bottom: 12px;
+      display: inline-block; width: 32px; height: 32px;
+      border: 3px solid rgba(139,92,246,.3); border-top-color: #8b5cf6;
+      border-radius: 50%; animation: spin .8s linear infinite; margin-bottom: 12px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Results wrapper ──────────────────────────── */
+    .results { max-width: 1600px; margin: 0 auto; }
+
+    /* ── Section card ─────────────────────────────── */
+    .section {
+      background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06);
+      border-radius: 16px; padding: 20px 24px; margin-bottom: 20px;
+    }
+    .section-title {
+      font-size: 1rem; font-weight: 700; margin-bottom: 14px;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+
+    /* ── Badges ───────────────────────────────────── */
+    .badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 20px; font-size: .73rem; font-weight: 600; }
+    .badge-added   { background: rgba(52,211,153,.15);  color: #34d399; }
+    .badge-removed { background: rgba(248,113,113,.15); color: #f87171; }
+    .badge-changed { background: rgba(251,191,36,.15);  color: #fbbf24; }
+    .badge-ai      { background: rgba(139,92,246,.15);  color: #a78bfa; }
+
+    /* ── Stats row ────────────────────────────────── */
     .stats-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
     .stat-card {
-      flex: 1; min-width: 100px;
-      background: rgba(255,255,255,0.03);
-      border-radius: 12px; padding: 16px;
-      text-align: center;
-      border: 1px solid rgba(255,255,255,0.06);
+      flex: 1; min-width: 90px; background: rgba(255,255,255,.03);
+      border-radius: 12px; padding: 14px; text-align: center;
+      border: 1px solid rgba(255,255,255,.06);
     }
-    .stat-number {
-      font-size: 1.8rem; font-weight: 700;
-      font-family: 'JetBrains Mono', monospace;
-    }
-    .stat-label { font-size: 0.75rem; color: #64748b; margin-top: 4px; }
-    .empty-state { text-align: center; padding: 16px; color: #475569; font-size: 0.85rem; }
-    input[type="file"] { display: none; }
-    .hidden { display: none; }
+    .stat-number { font-size: 1.7rem; font-weight: 700; font-family: 'JetBrains Mono',monospace; }
+    .stat-label  { font-size: .73rem; color: #64748b; margin-top: 4px; }
 
-    /* ── Legend ───────────────────────────────────────────── */
-    .legend {
-      display: flex; gap: 20px; flex-wrap: wrap;
-      margin-bottom: 14px; font-size: 0.78rem; color: #64748b;
-    }
+    /* ── Legend ───────────────────────────────────── */
+    .legend { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 12px; font-size: .77rem; color: #64748b; }
     .legend-item { display: flex; align-items: center; gap: 6px; }
-    .legend-dot  { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+    .legend-dot  { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
 
-    /* ── Side-by-side comparison table ───────────────────── */
+    /* ── AI Summary text ──────────────────────────── */
+    .ai-summary { line-height: 1.9; color: #cbd5e1; white-space: pre-wrap; font-size: .88rem; }
+
+    /* ── Comparison table wrapper ─────────────────── */
     .compare-wrap {
-      overflow: auto;
-      border-radius: 8px;
-      max-height: 620px;
-      min-height: 60px;
-      border: 1px solid rgba(255,255,255,0.12);
+      overflow: auto; border-radius: 8px; max-height: 640px; min-height: 80px;
+      border: 1px solid rgba(255,255,255,.1);
     }
     .compare-table {
-      border-collapse: collapse;
-      font-size: 0.8rem;
-      white-space: nowrap;
-      min-width: 100%;
+      border-collapse: collapse; font-size: .8rem; white-space: nowrap; min-width: 100%;
     }
 
-    /* Sticky header rows */
+    /* ── Table headers ────────────────────────────── */
     .compare-table thead th {
-      position: sticky;
-      z-index: 10;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
+      position: sticky; top: 0; z-index: 10;
+      border-bottom: 1px solid rgba(255,255,255,.09);
+      padding: 8px 12px;
     }
-    /* First header row (File A / File B labels) */
-    .compare-table thead tr:first-child th {
-      top: 0;
-      padding: 10px 14px;
-      font-weight: 700;
-      font-size: 0.82rem;
-    }
-    /* Second header row (column names) */
-    .compare-table thead tr:nth-child(2) th {
-      /* top is set by JS after render */
-      padding: 5px 12px;
-      font-weight: 500;
-      font-size: 0.73rem;
-      color: #94a3b8;
-      border-bottom: 2px solid rgba(255,255,255,0.12);
-    }
+    .compare-table thead tr:nth-child(2) th { border-bottom: 2px solid rgba(255,255,255,.12); }
 
-    /* Row-number column */
-    .th-rownum {
-      background: #171c28 !important;
-      color: #475569 !important;
-      min-width: 52px; text-align: center;
-      position: sticky !important; left: 0;
-      z-index: 25 !important;
+    /* Sticky fix columns (category + item) */
+    .th-cat {
+      background: #171c28 !important; color: #64748b !important;
+      min-width: 80px; text-align: left;
+      position: sticky !important; left: 0; z-index: 22 !important;
     }
-    /* File A header */
-    .th-a {
-      background: rgba(12,32,62,0.97) !important;
-      color: #60a5fa !important;
-      text-align: center;
-      border-left: 2px solid rgba(96,165,250,0.35);
+    .th-item {
+      background: #171c28 !important; color: #94a3b8 !important;
+      min-width: 180px; text-align: left;
+      position: sticky !important; left: 80px; z-index: 22 !important;
+      border-right: 2px solid rgba(255,255,255,.1);
     }
-    /* File B header */
-    .th-b {
-      background: rgba(8,38,28,0.97) !important;
-      color: #34d399 !important;
-      text-align: center;
-      border-left: 2px solid rgba(52,211,153,0.35);
+    /* Value column group header */
+    .th-valcol {
+      background: rgba(30,40,70,.95) !important;
+      color: #a78bfa !important; text-align: center;
+      border-left: 2px solid rgba(139,92,246,.25);
+      font-size: .78rem;
     }
-    /* Column-name sub-headers */
-    .th-col-a {
-      background: rgba(12,32,62,0.92) !important;
-      color: #7fb3f5 !important;
-      border-left: 1px solid rgba(96,165,250,0.12);
-      min-width: 100px;
-    }
-    .th-col-b {
-      background: rgba(8,38,28,0.92) !important;
-      color: #5ecba1 !important;
-      border-left: 1px solid rgba(52,211,153,0.12);
-      min-width: 100px;
-    }
-    /* Divider column */
-    .th-sep {
-      background: rgba(255,255,255,0.04) !important;
-      width: 6px; padding: 0 !important;
-      border: none !important;
-    }
+    /* Sub-headers */
+    .th-val-a  { background: rgba(12,32,62,.92) !important;  color: #7fb3f5 !important; text-align: right; min-width: 90px; }
+    .th-val-b  { background: rgba(8,38,28,.92)  !important;  color: #5ecba1 !important; text-align: right; min-width: 90px; }
+    .th-diff   { background: rgba(40,30,10,.92)  !important; color: #fbbf24 !important; text-align: right; min-width: 90px; }
+    .th-pct    { background: rgba(40,30,10,.92)  !important; color: #fbbf24 !important; text-align: right; min-width: 70px; }
+    .th-text-a { background: rgba(12,32,62,.92) !important;  color: #7fb3f5 !important; text-align: left; min-width: 100px; }
+    .th-text-b { background: rgba(8,38,28,.92)  !important;  color: #5ecba1 !important; text-align: left; min-width: 100px; }
 
-    /* Data cells */
+    /* ── Table cells ──────────────────────────────── */
     .compare-table td {
-      padding: 6px 12px;
-      border-bottom: 1px solid rgba(255,255,255,0.04);
-      max-width: 280px;
-      word-break: break-word;
-      white-space: normal;
-      vertical-align: top;
+      padding: 6px 12px; border-bottom: 1px solid rgba(255,255,255,.04);
+      vertical-align: middle;
     }
-    .td-rownum {
-      color: #475569; text-align: center;
-      font-size: 0.73rem;
-      font-family: 'JetBrains Mono', monospace;
-      position: sticky; left: 0;
-      background: #171c28; z-index: 5;
-      white-space: nowrap;
+    .td-cat {
+      color: #64748b; font-size: .75rem; white-space: nowrap;
+      position: sticky; left: 0; background: #171c28; z-index: 5;
     }
-    .td-a {
-      background: rgba(12,32,62,0.18);
-      border-left: 1px solid rgba(96,165,250,0.07);
+    .td-item {
+      color: #e2e8f0; font-weight: 500; white-space: normal; word-break: break-word; max-width: 220px;
+      position: sticky; left: 80px; background: #171c28; z-index: 5;
+      border-right: 2px solid rgba(255,255,255,.07);
     }
-    .td-b {
-      background: rgba(8,38,28,0.18);
-      border-left: 1px solid rgba(52,211,153,0.07);
-    }
-    .td-sep { background: rgba(255,255,255,0.04); padding: 0; width: 6px; }
+    .td-a    { background: rgba(12,32,62,.18); text-align: right; font-family: 'JetBrains Mono',monospace; border-left: 1px solid rgba(96,165,250,.07); }
+    .td-b    { background: rgba(8,38,28,.18);  text-align: right; font-family: 'JetBrains Mono',monospace; border-left: 1px solid rgba(52,211,153,.07); }
+    .td-diff { text-align: right; font-family: 'JetBrains Mono',monospace; background: rgba(40,30,10,.1); font-weight: 600; }
+    .td-pct  { text-align: right; font-family: 'JetBrains Mono',monospace; background: rgba(40,30,10,.1); font-size: .75rem; }
+    .td-text-a { background: rgba(12,32,62,.18); white-space: normal; word-break: break-word; max-width: 200px; }
+    .td-text-b { background: rgba(8,38,28,.18);  white-space: normal; word-break: break-word; max-width: 200px; }
 
-    /* Row-level highlighting */
-    .row-added .td-a   { background: rgba(52,211,153,0.04) !important; color: #334155; }
-    .row-added .td-b   { background: rgba(52,211,153,0.13) !important; color: #34d399; }
-    .row-added .td-rownum { background: rgba(52,211,153,0.18) !important; color: #34d399; }
-    .row-removed .td-a { background: rgba(248,113,113,0.13) !important; color: #f87171; }
-    .row-removed .td-b { background: rgba(248,113,113,0.04) !important; color: #334155; }
-    .row-removed .td-rownum { background: rgba(248,113,113,0.18) !important; color: #f87171; }
+    /* Row-level highlights */
+    .row-added   .td-cat, .row-added   .td-item { background: rgba(52,211,153,.15) !important; }
+    .row-added   .td-a   { background: rgba(52,211,153,.04) !important; color: #334155; }
+    .row-added   .td-b   { background: rgba(52,211,153,.18) !important; color: #34d399; }
+    .row-added   .td-text-a { background: rgba(52,211,153,.04) !important; color: #334155; }
+    .row-added   .td-text-b { background: rgba(52,211,153,.18) !important; color: #34d399; }
+    .row-removed .td-cat, .row-removed .td-item { background: rgba(248,113,113,.15) !important; }
+    .row-removed .td-a   { background: rgba(248,113,113,.18) !important; color: #f87171; }
+    .row-removed .td-b   { background: rgba(248,113,113,.04) !important; color: #334155; }
+    .row-removed .td-text-a { background: rgba(248,113,113,.18) !important; color: #f87171; }
+    .row-removed .td-text-b { background: rgba(248,113,113,.04) !important; color: #334155; }
 
-    /* Cell-level diff highlight */
-    .cell-diff-a {
-      background: rgba(251,191,36,0.18) !important;
-      color: #fb923c !important;
-      text-decoration: line-through;
-    }
-    .cell-diff-b {
-      background: rgba(251,191,36,0.28) !important;
-      color: #fbbf24 !important;
-      font-weight: 700;
-    }
+    /* Cell-level diff */
+    .cell-diff { background: rgba(251,191,36,.22) !important; }
+
+    /* Diff direction colors */
+    .diff-up   { color: #f87171 !important; }
+    .diff-down { color: #34d399 !important; }
+    .diff-zero { color: #475569 !important; }
 
     /* Truncation notice */
     .truncate-notice {
-      text-align: center; padding: 14px;
-      color: #64748b; font-size: 0.8rem;
-      background: rgba(255,255,255,0.02);
+      text-align: center; padding: 12px; color: #64748b; font-size: .78rem;
+      background: rgba(255,255,255,.02);
     }
+
+    input[type="file"] { display: none; }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
 <div class="app">
+
   <div class="header">
-    <h1>📊 Excel 智慧比對工具</h1>
-    <p>上傳兩個 Excel 檔案，自動分析並整理差異重點</p>
+    <h1>📊 Excel 財務報價比對工具</h1>
+    <p>支援多工作表 · 以 Item 名稱為識別鍵 · 自動計算差異金額與百分比</p>
   </div>
 
+  <!-- Upload -->
   <div class="upload-grid">
     <label class="upload-zone" id="zone1"
-      ondragover="handleDragOver(event,1)"
-      ondragleave="handleDragLeave(1)"
-      ondrop="handleDrop(event,1)">
+      ondragover="handleDragOver(event,1)" ondragleave="handleDragLeave(1)" ondrop="handleDrop(event,1)">
       <input type="file" id="file1" accept=".xlsx,.xls" onchange="handleFileChange(1)">
       <div class="upload-icon" id="icon1">📄</div>
-      <div class="upload-label">檔案 A</div>
+      <div class="upload-label">檔案 A（舊版）</div>
       <div class="upload-name hidden" id="name1"></div>
       <div class="upload-hint" id="hint1">點擊或拖曳 Excel 檔案到此處</div>
     </label>
-
     <label class="upload-zone" id="zone2"
-      ondragover="handleDragOver(event,2)"
-      ondragleave="handleDragLeave(2)"
-      ondrop="handleDrop(event,2)">
+      ondragover="handleDragOver(event,2)" ondragleave="handleDragLeave(2)" ondrop="handleDrop(event,2)">
       <input type="file" id="file2" accept=".xlsx,.xls" onchange="handleFileChange(2)">
       <div class="upload-icon" id="icon2">📄</div>
-      <div class="upload-label">檔案 B</div>
+      <div class="upload-label">檔案 B（新版）</div>
       <div class="upload-name hidden" id="name2"></div>
       <div class="upload-hint" id="hint2">點擊或拖曳 Excel 檔案到此處</div>
     </label>
+  </div>
+
+  <!-- Sheet summary -->
+  <div class="sheet-summary hidden" id="sheetSummaryEl">
+    <div class="sheet-summary-inner" id="sheetSummaryInner"></div>
+  </div>
+
+  <!-- Sheet selector -->
+  <div class="sheet-selector hidden" id="sheetSelectorEl">
+    <label>🗂️ 選擇要比對的工作表</label>
+    <select class="sheet-select" id="sheetSelect"></select>
   </div>
 
   <button class="compare-btn" id="compareBtn" onclick="startCompare()" disabled>🔍 開始比對</button>
@@ -339,84 +275,156 @@
 </div>
 
 <script>
-  let files = { 1: null, 2: null };
+  let workbooks = { 1: null, 2: null };
 
-  function handleDragOver(e, n) {
-    e.preventDefault();
-    document.getElementById('zone' + n).classList.add('drag-over');
-  }
-  function handleDragLeave(n) {
-    document.getElementById('zone' + n).classList.remove('drag-over');
-  }
+  // ── File loading ─────────────────────────────────────────────
+  function handleDragOver(e, n) { e.preventDefault(); document.getElementById('zone'+n).classList.add('drag-over'); }
+  function handleDragLeave(n)   { document.getElementById('zone'+n).classList.remove('drag-over'); }
   function handleDrop(e, n) {
     e.preventDefault();
-    document.getElementById('zone' + n).classList.remove('drag-over');
+    document.getElementById('zone'+n).classList.remove('drag-over');
     const f = e.dataTransfer.files[0];
-    if (f && (f.name.endsWith('.xlsx') || f.name.endsWith('.xls'))) setFile(n, f);
+    if (f && /\.(xlsx|xls)$/i.test(f.name)) loadFile(n, f);
   }
   function handleFileChange(n) {
-    const input = document.getElementById('file' + n);
-    if (input.files[0]) setFile(n, input.files[0]);
-  }
-  function setFile(n, f) {
-    files[n] = f;
-    document.getElementById('zone' + n).classList.add('loaded');
-    document.getElementById('icon' + n).textContent = '✅';
-    document.getElementById('name' + n).textContent = f.name;
-    document.getElementById('name' + n).classList.remove('hidden');
-    document.getElementById('hint' + n).classList.add('hidden');
-    document.getElementById('compareBtn').disabled = !(files[1] && files[2]);
+    const f = document.getElementById('file'+n).files[0];
+    if (f) loadFile(n, f);
   }
 
-  function parseExcel(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const wb = XLSX.read(e.target.result, { type: 'array' });
-          const ws = wb.Sheets[wb.SheetNames[0]];
-          resolve(XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }));
-        } catch(err) { reject(err); }
-      };
-      reader.onerror = reject;
-      reader.readAsArrayBuffer(file);
-    });
+  function loadFile(n, f) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        workbooks[n] = XLSX.read(e.target.result, { type: 'array' });
+        document.getElementById('zone'+n).classList.add('loaded');
+        document.getElementById('icon'+n).textContent = '✅';
+        document.getElementById('name'+n).textContent = f.name;
+        document.getElementById('name'+n).classList.remove('hidden');
+        document.getElementById('hint'+n).classList.add('hidden');
+        updateSheetUI();
+      } catch(err) { alert('讀取失敗：' + f.name + '\n' + err.message); }
+    };
+    reader.onerror = () => alert('讀取失敗：' + f.name);
+    reader.readAsArrayBuffer(f);
   }
 
-  // Key-based comparison using the first column as a unique identifier.
-  // Row 0 is the header row; data rows start from index 1.
-  // Returns { rows, added, removed, changed, maxCols, headers }
-  // rows[i] = { type, key, rowNumA, rowNumB, data1, data2, changedCols:Set }
+  // ── Sheet selector UI ─────────────────────────────────────────
+  function updateSheetUI() {
+    if (!workbooks[1] || !workbooks[2]) return;
+
+    const s1 = workbooks[1].SheetNames;
+    const s2 = workbooks[2].SheetNames;
+    const common = s1.filter(s => s2.includes(s));
+    const aOnly  = s1.filter(s => !s2.includes(s));
+    const bOnly  = s2.filter(s => !s1.includes(s));
+
+    // Sheet summary
+    const chips = (arr, cls) => arr.map(s => `<span class="sheet-chip ${cls}">${esc(s)}</span>`).join('');
+    document.getElementById('sheetSummaryInner').innerHTML = `
+      <div class="sheet-group">
+        <span class="sheet-group-label">📁 檔案 A（${s1.length} 個工作表）</span>
+        ${chips(s1.filter(s => common.includes(s)), 'chip-common')}
+        ${chips(aOnly, 'chip-a-only')}
+      </div>
+      <div class="sheet-group">
+        <span class="sheet-group-label">📁 檔案 B（${s2.length} 個工作表）</span>
+        ${chips(s2.filter(s => common.includes(s)), 'chip-common')}
+        ${chips(bOnly, 'chip-b-only')}
+      </div>
+      ${aOnly.length > 0 ? `<div class="sheet-note sheet-note-red">⚠️ 僅 A 有：${aOnly.map(esc).join('、')}</div>` : ''}
+      ${bOnly.length > 0 ? `<div class="sheet-note sheet-note-green">✅ 僅 B 有：${bOnly.map(esc).join('、')}</div>` : ''}
+      ${common.length === 0 ? '<div class="sheet-note sheet-note-red">❌ 兩個檔案沒有共同工作表，無法比對</div>' : `<div class="sheet-note" style="color:#a78bfa;background:rgba(139,92,246,.1)">✔ 共同工作表：${common.length} 個</div>`}
+    `;
+    document.getElementById('sheetSummaryEl').classList.remove('hidden');
+
+    // Sheet select
+    const sel = document.getElementById('sheetSelect');
+    sel.innerHTML = common.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+    document.getElementById('sheetSelectorEl').classList.toggle('hidden', common.length === 0);
+    document.getElementById('compareBtn').disabled = common.length === 0;
+  }
+
+  // ── Helper functions ──────────────────────────────────────────
+  function esc(v) {
+    return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function parseNum(v) {
+    if (v === null || v === undefined || v === '') return null;
+    const n = parseFloat(String(v).replace(/,/g,''));
+    return isNaN(n) ? null : n;
+  }
+
+  function fmtNum(v) {
+    if (v === null || v === undefined || v === '') return '';
+    const n = parseNum(v);
+    if (n === null) return esc(String(v));
+    return n.toLocaleString('zh-TW', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+
+  function fmtDiff(diff) {
+    if (diff === null) return '';
+    return (diff > 0 ? '+' : '') + diff.toLocaleString('zh-TW', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+
+  function fmtPct(pct) {
+    if (pct === null) return '';
+    return (pct > 0 ? '+' : '') + pct.toFixed(1) + '%';
+  }
+
+  // ── Core: get sheet rows ──────────────────────────────────────
+  function getSheetData(wb, name) {
+    const ws = wb.Sheets[name];
+    if (!ws) return [];
+    return XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  }
+
+  // ── Core: detect numeric columns (cols 2+) ────────────────────
+  function detectNumericCols(data, headerLen) {
+    const numeric = new Set();
+    for (let c = 2; c < headerLen; c++) {
+      let numCnt = 0, total = 0;
+      for (let r = 1; r < Math.min(data.length, 20); r++) {
+        const v = data[r]?.[c];
+        if (v !== '' && v !== null && v !== undefined) {
+          total++;
+          if (parseNum(v) !== null) numCnt++;
+        }
+      }
+      if (total > 0 && numCnt / total >= 0.5) numeric.add(c);
+    }
+    return numeric;
+  }
+
+  // ── Core: key-based comparison ────────────────────────────────
+  // col[0] = 分類(Category), col[1] = Item (key), col[2+] = values
   function compareData(data1, data2) {
-    const headers1 = data1[0] || [];
-    const headers2 = data2[0] || [];
-    const maxCols = Math.max(
-      headers1.length, headers2.length,
-      ...data1.slice(1).map(r => r.length),
-      ...data2.slice(1).map(r => r.length),
-      1
+    const h1 = data1[0] || [];
+    const h2 = data2[0] || [];
+    const headers = h1.length >= h2.length ? h1 : h2;
+    const maxCols = Math.max(h1.length, h2.length, 2);
+    const numericCols = detectNumericCols(
+      data1.length > data2.length ? data1 : data2,
+      maxCols
     );
-    const headers = headers1.length >= headers2.length ? headers1 : headers2;
 
-    // Build key → { rowData, rowNum } maps (key = first column value)
-    const map1 = new Map();
-    for (let r = 1; r < data1.length; r++) {
-      const row = data1[r] || [];
-      const key = String(row[0] ?? '');
-      if (!map1.has(key)) map1.set(key, { rowData: row, rowNum: r + 1 });
-    }
-    const map2 = new Map();
-    for (let r = 1; r < data2.length; r++) {
-      const row = data2[r] || [];
-      const key = String(row[0] ?? '');
-      if (!map2.has(key)) map2.set(key, { rowData: row, rowNum: r + 1 });
-    }
+    // Build maps: Item (col[1], trimmed) → entry
+    const buildMap = (data) => {
+      const m = new Map();
+      for (let r = 1; r < data.length; r++) {
+        const row = data[r] || [];
+        const key = String(row[1] ?? '').trim();
+        if (key && !m.has(key))
+          m.set(key, { category: String(row[0] ?? '').trim(), rowData: row, rowNum: r + 1 });
+      }
+      return m;
+    };
+    const map1 = buildMap(data1);
+    const map2 = buildMap(data2);
 
-    // Merge key order: A keys first, then B-only keys
+    // Ordered key list: A order first, then B-only
     const allKeys = [...map1.keys()];
-    for (const key of map2.keys()) {
-      if (!map1.has(key)) allKeys.push(key);
-    }
+    for (const k of map2.keys()) if (!map1.has(k)) allKeys.push(k);
 
     const rows = [], added = [], removed = [], changed = [];
 
@@ -425,257 +433,257 @@
       const e2 = map2.get(key);
 
       if (!e1) {
-        // Only in B (added)
-        rows.push({ type: 'added', key, rowNumA: null, rowNumB: e2.rowNum,
-                    data1: null, data2: e2.rowData, changedCols: new Set() });
-        added.push({ key, row: e2.rowNum, data: e2.rowData });
+        // B only
+        rows.push({ type:'added', key, category:e2.category,
+                    rowNumA:null, rowNumB:e2.rowNum,
+                    data1:null, data2:e2.rowData, changedCols:new Set(), colDiffs:[] });
+        added.push({ key, category:e2.category, data:e2.rowData });
+
       } else if (!e2) {
-        // Only in A (removed)
-        rows.push({ type: 'removed', key, rowNumA: e1.rowNum, rowNumB: null,
-                    data1: e1.rowData, data2: null, changedCols: new Set() });
-        removed.push({ key, row: e1.rowNum, data: e1.rowData });
+        // A only
+        rows.push({ type:'removed', key, category:e1.category,
+                    rowNumA:e1.rowNum, rowNumB:null,
+                    data1:e1.rowData, data2:null, changedCols:new Set(), colDiffs:[] });
+        removed.push({ key, category:e1.category, data:e1.rowData });
+
       } else {
-        // In both — compare column by column
+        // Both — compare col by col (starting from col 2)
         const changedCols = new Set();
-        const changes = [];
-        for (let c = 0; c < maxCols; c++) {
-          const v1 = String(e1.rowData[c] ?? '');
-          const v2 = String(e2.rowData[c] ?? '');
-          if (v1 !== v2) { changedCols.add(c); changes.push({ col: c + 1, old: v1, new: v2 }); }
+        const colDiffs = [];
+        for (let c = 2; c < maxCols; c++) {
+          const v1 = String(e1.rowData[c] ?? '').trim();
+          const v2 = String(e2.rowData[c] ?? '').trim();
+          if (v1 !== v2) {
+            changedCols.add(c);
+            const nA = parseNum(v1), nB = parseNum(v2);
+            colDiffs.push({ col:c, oldVal:v1, newVal:v2, numA:nA, numB:nB });
+          }
         }
         if (changedCols.size > 0) {
-          rows.push({ type: 'changed', key, rowNumA: e1.rowNum, rowNumB: e2.rowNum,
-                      data1: e1.rowData, data2: e2.rowData, changedCols });
-          changed.push({ key, row: e1.rowNum, changes });
+          rows.push({ type:'changed', key, category:e1.category,
+                      rowNumA:e1.rowNum, rowNumB:e2.rowNum,
+                      data1:e1.rowData, data2:e2.rowData, changedCols, colDiffs });
+          changed.push({ key, category:e1.category, colDiffs });
         } else {
-          rows.push({ type: 'same', key, rowNumA: e1.rowNum, rowNumB: e2.rowNum,
-                      data1: e1.rowData, data2: e2.rowData, changedCols: new Set() });
+          rows.push({ type:'same', key, category:e1.category,
+                      rowNumA:e1.rowNum, rowNumB:e2.rowNum,
+                      data1:e1.rowData, data2:e2.rowData, changedCols:new Set(), colDiffs:[] });
         }
       }
     }
 
-    return { rows, added, removed, changed, maxCols, headers };
+    return { rows, added, removed, changed, maxCols, headers, numericCols };
   }
 
-  // Escape HTML special chars
-  function esc(v) {
-    return String(v ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-  }
+  // ── startCompare ──────────────────────────────────────────────
+  function startCompare() {
+    const sheetName = document.getElementById('sheetSelect').value;
+    if (!sheetName || !workbooks[1] || !workbooks[2]) return;
 
-  function showLocalAnalysis(result) {
-    const { added, removed, changed, headers } = result;
-    const total = added.length + removed.length + changed.length;
-
-    const colName = idx => {
-      const h = headers[idx];
-      return h ? `「${h}」` : `欄位 ${idx + 1}`;
-    };
-
-    let s = '';
-
-    // 1. 整體差異摘要
-    s += '📊 整體差異摘要\n';
-    if (total === 0) {
-      s += '兩個檔案內容完全相同，無任何差異。\n\n';
-    } else {
-      s += `共發現 ${total} 個差異項目：B 獨有 ${added.length} 筆、A 獨有 ${removed.length} 筆、內容修改 ${changed.length} 筆。\n`;
-      s += `（比對依據：第一欄 ${colName(0)} 作為唯一識別鍵）\n\n`;
-    }
-
-    // 2. 主要差異重點（含具體欄位值）
-    s += '🔑 主要差異重點\n';
-    if (changed.length > 0) {
-      changed.slice(0, 10).forEach(row => {
-        const keyLabel = esc(row.key);
-        const diffs = row.changes.map(c => {
-          const name = colName(c.col - 1);
-          const numA = parseFloat(c.old), numB = parseFloat(c.new);
-          const isNum = !isNaN(numA) && !isNaN(numB) && c.old !== '' && c.new !== '';
-          const note = isNum
-            ? `（差異 ${numB - numA > 0 ? '+' : ''}${(numB - numA).toLocaleString()}）`
-            : '';
-          return `${name}：A=${c.old || '(空白)'} vs B=${c.new || '(空白)'}${note}`;
-        }).join('\n    ');
-        s += `• [${keyLabel}]\n    ${diffs}\n`;
-      });
-      if (changed.length > 10) s += `• … 還有 ${changed.length - 10} 筆修改未列出\n`;
-    }
-    if (added.length   > 0) s += `• 檔案 B 獨有 ${added.length} 筆（表格綠色列）\n`;
-    if (removed.length > 0) s += `• 檔案 A 獨有 ${removed.length} 筆（表格紅色列）\n`;
-    if (total === 0) s += '• 所有識別鍵與欄位均一致\n';
-    s += '\n';
-
-    // 3. A 獨有的項目
-    if (removed.length > 0) {
-      s += '⚠️ 檔案 A 獨有（B 中不存在）\n';
-      removed.slice(0, 6).forEach(row => {
-        const preview = (row.data || []).slice(0, 5).filter(v => String(v) !== '').join(' | ');
-        s += `• [${esc(row.key)}]　${preview}\n`;
-      });
-      if (removed.length > 6) s += `• … 還有 ${removed.length - 6} 筆\n`;
-      s += '\n';
-    }
-
-    // 4. B 獨有的項目
-    if (added.length > 0) {
-      s += '✅ 檔案 B 獨有（A 中不存在）\n';
-      added.slice(0, 6).forEach(row => {
-        const preview = (row.data || []).slice(0, 5).filter(v => String(v) !== '').join(' | ');
-        s += `• [${esc(row.key)}]　${preview}\n`;
-      });
-      if (added.length > 6) s += `• … 還有 ${added.length - 6} 筆\n`;
-      s += '\n';
-    }
-
-    // 5. 建議
-    s += '💡 建議\n';
-    if (total > 0) {
-      if (removed.length > 0) s += '• 請確認 A 獨有的資料是否為刻意刪除，避免遺失。\n';
-      if (added.length   > 0) s += '• 請確認 B 新增的資料來源是否正確。\n';
-      if (changed.length > 0) s += '• 請逐一核對黃色高亮儲格，確認修改符合預期。\n';
-    } else {
-      s += '• 兩份檔案完全一致，可以放心使用。\n';
-    }
-
-    document.getElementById('aiContent').innerHTML = `<div class="ai-summary">${s}</div>`;
-  }
-
-  async function startCompare() {
     const btn = document.getElementById('compareBtn');
-    btn.disabled = true;
-    btn.textContent = '⏳ 比對中...';
+    btn.disabled = true; btn.textContent = '⏳ 比對中...';
     document.getElementById('loadingEl').classList.remove('hidden');
     document.getElementById('results').classList.add('hidden');
 
-    try {
-      const [data1, data2] = await Promise.all([parseExcel(files[1]), parseExcel(files[2])]);
-      const result = compareData(data1, data2);
-
-      document.getElementById('loadingEl').classList.add('hidden');
-      renderResults(result);
-      showLocalAnalysis(result);
-    } catch(err) {
-      document.getElementById('loadingEl').classList.add('hidden');
-      alert('讀取檔案失敗，請確認是有效的 Excel 檔案');
-    }
-
-    btn.disabled = false;
-    btn.textContent = '🔍 開始比對';
+    // setTimeout lets the browser repaint before heavy work
+    setTimeout(() => {
+      try {
+        const data1 = getSheetData(workbooks[1], sheetName);
+        const data2 = getSheetData(workbooks[2], sheetName);
+        const result = compareData(data1, data2);
+        document.getElementById('loadingEl').classList.add('hidden');
+        renderResults(result, sheetName);
+        showAnalysis(result, sheetName);
+      } catch(err) {
+        document.getElementById('loadingEl').classList.add('hidden');
+        alert('比對失敗：' + err.message);
+      }
+      btn.disabled = false; btn.textContent = '🔍 開始比對';
+    }, 50);
   }
 
-  function renderResults(result) {
-    const { rows, added, removed, changed, maxCols, headers } = result;
+  // ── renderResults ─────────────────────────────────────────────
+  function renderResults(result, sheetName) {
+    const { rows, added, removed, changed, maxCols, headers, numericCols } = result;
     const total = added.length + removed.length + changed.length;
-    const LIMIT = 300;
-    const displayRows = rows.slice(0, LIMIT);
-    const truncated = rows.length > LIMIT;
+    const valueCols = Array.from({ length: Math.max(maxCols - 2, 0) }, (_, i) => i + 2);
+    const LIMIT = 500;
 
-    // Column header labels (same for both sides — same schema)
-    const hA = Array.from({ length: maxCols }, (_, i) => esc(headers[i] ?? `欄 ${i + 1}`));
-    const hB = Array.from({ length: maxCols }, (_, i) => esc(headers[i] ?? `欄 ${i + 1}`));
-
-    // ── thead row 1: File A / File B labels ─────────────────
-    const thRow1 =
-      `<th class="th-rownum" rowspan="2">行</th>` +
-      `<th colspan="${maxCols}" class="th-a">📁 檔案 A</th>` +
-      `<th class="th-sep" rowspan="2"></th>` +
-      `<th colspan="${maxCols}" class="th-b">📁 檔案 B</th>`;
-
-    // ── thead row 2: column names ────────────────────────────
-    const thRow2 =
-      hA.map(h => `<th class="th-col-a">${h}</th>`).join('') +
-      `<th class="th-sep"></th>` +
-      hB.map(h => `<th class="th-col-b">${h}</th>`).join('');
-
-    // ── tbody ────────────────────────────────────────────────
-    let tbody = displayRows.map(row => {
-      const typeClass = row.type === 'added' ? 'row-added'
-                      : row.type === 'removed' ? 'row-removed'
-                      : '';
-      const rowLabel = row.rowNumA ?? row.rowNumB;
-      let tds = `<td class="td-rownum">${rowLabel}</td>`;
-
-      // A side
-      for (let c = 0; c < maxCols; c++) {
-        const val = row.data1 != null ? esc(row.data1[c] ?? '') : '';
-        const cls = 'td-a' + (row.changedCols.has(c) ? ' cell-diff-a' : '');
-        tds += `<td class="${cls}">${val}</td>`;
+    // ── thead row 1 ────────────────────────────────────
+    let th1 = `<th class="th-cat"  rowspan="2">分類</th>` +
+              `<th class="th-item" rowspan="2">Item</th>`;
+    for (const c of valueCols) {
+      const label = esc(headers[c] ?? `欄位 ${c - 1}`);
+      if (numericCols.has(c)) {
+        th1 += `<th colspan="4" class="th-valcol">${label}</th>`;
+      } else {
+        th1 += `<th colspan="2" class="th-valcol">${label}</th>`;
       }
-      tds += `<td class="td-sep"></td>`;
-      // B side
-      for (let c = 0; c < maxCols; c++) {
-        const val = row.data2 != null ? esc(row.data2[c] ?? '') : '';
-        const cls = 'td-b' + (row.changedCols.has(c) ? ' cell-diff-b' : '');
-        tds += `<td class="${cls}">${val}</td>`;
-      }
-
-      return `<tr class="${typeClass}">${tds}</tr>`;
-    }).join('');
-
-    if (rows.length === 0) {
-      tbody = `<tr><td colspan="${maxCols * 2 + 2}" class="truncate-notice">（兩個檔案均無資料列）</td></tr>`;
-    } else if (truncated) {
-      tbody += `<tr><td colspan="${maxCols * 2 + 2}" class="truncate-notice">
-        ⚠️ 僅顯示前 ${LIMIT} 行，共 ${rows.length} 行資料
-      </td></tr>`;
     }
 
-    // ── Assemble HTML ────────────────────────────────────────
+    // ── thead row 2 ────────────────────────────────────
+    let th2 = '';
+    for (const c of valueCols) {
+      if (numericCols.has(c)) {
+        th2 += `<th class="th-val-a">A（舊）</th><th class="th-val-b">B（新）</th>` +
+               `<th class="th-diff">差異額</th><th class="th-pct">差異%</th>`;
+      } else {
+        th2 += `<th class="th-text-a">A（舊）</th><th class="th-text-b">B（新）</th>`;
+      }
+    }
+
+    // ── tbody ──────────────────────────────────────────
+    const displayRows = rows.slice(0, LIMIT);
+    let tbody = displayRows.map(row => {
+      const cls = row.type === 'added' ? 'row-added' : row.type === 'removed' ? 'row-removed' : '';
+      let tds = `<td class="td-cat">${esc(row.category)}</td><td class="td-item">${esc(row.key)}</td>`;
+
+      for (const c of valueCols) {
+        const rawA = row.data1 ? String(row.data1[c] ?? '') : '';
+        const rawB = row.data2 ? String(row.data2[c] ?? '') : '';
+        const isDiff = row.changedCols.has(c);
+        const diffCls = isDiff ? ' cell-diff' : '';
+
+        if (numericCols.has(c)) {
+          const nA = parseNum(rawA), nB = parseNum(rawB);
+          const diff = (nA !== null && nB !== null) ? nB - nA : null;
+          const pct  = (diff !== null && nA !== 0)  ? (diff / Math.abs(nA)) * 100 : null;
+          const dirCls = diff === null ? '' : diff > 0 ? ' diff-up' : diff < 0 ? ' diff-down' : ' diff-zero';
+          tds += `<td class="td-a${diffCls}">${fmtNum(rawA)}</td>`;
+          tds += `<td class="td-b${diffCls}">${fmtNum(rawB)}</td>`;
+          tds += `<td class="td-diff${dirCls}${isDiff ? ' cell-diff' : ''}">${esc(fmtDiff(diff))}</td>`;
+          tds += `<td class="td-pct${dirCls}${isDiff  ? ' cell-diff' : ''}">${esc(fmtPct(pct))}</td>`;
+        } else {
+          tds += `<td class="td-text-a${diffCls}">${esc(rawA)}</td>`;
+          tds += `<td class="td-text-b${diffCls}">${esc(rawB)}</td>`;
+        }
+      }
+      return `<tr class="${cls}">${tds}</tr>`;
+    }).join('');
+
+    // Fallback / truncation
+    const totalCols = 2 + valueCols.reduce((a, c) => a + (numericCols.has(c) ? 4 : 2), 0);
+    if (rows.length === 0) {
+      tbody = `<tr><td colspan="${totalCols}" class="truncate-notice">（此工作表無可比對的 Item 資料）</td></tr>`;
+    } else if (rows.length > LIMIT) {
+      tbody += `<tr><td colspan="${totalCols}" class="truncate-notice">⚠️ 僅顯示前 ${LIMIT} 行，共 ${rows.length} 筆</td></tr>`;
+    }
+
+    // ── Assemble ───────────────────────────────────────
     const html = `
       <div class="stats-row">
-        <div class="stat-card"><div class="stat-number" style="color:#34d399">${added.length}</div><div class="stat-label">新增行</div></div>
-        <div class="stat-card"><div class="stat-number" style="color:#f87171">${removed.length}</div><div class="stat-label">刪除行</div></div>
-        <div class="stat-card"><div class="stat-number" style="color:#fbbf24">${changed.length}</div><div class="stat-label">修改行</div></div>
-        <div class="stat-card"><div class="stat-number" style="color:#60a5fa">${total}</div><div class="stat-label">總差異</div></div>
+        <div class="stat-card"><div class="stat-number">${rows.length}</div><div class="stat-label">總 Item 數</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:#fbbf24">${changed.length}</div><div class="stat-label">數值變動</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:#f87171">${removed.length}</div><div class="stat-label">A 獨有</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:#34d399">${added.length}</div><div class="stat-label">B 獨有</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:#60a5fa">${total}</div><div class="stat-label">總差異數</div></div>
       </div>
 
       <div class="section">
-        <div class="section-title">🤖 智慧分析 <span class="badge badge-ai">本地分析</span></div>
-        <div id="aiContent"><div class="loading"><div class="loading-spinner"></div><div>分析中...</div></div></div>
+        <div class="section-title">🤖 差異摘要 <span class="badge badge-ai">自動分析</span></div>
+        <div id="aiContent"></div>
       </div>
 
-      <div class="section" style="padding: 20px 24px;">
+      <div class="section" style="padding:16px 20px;">
         <div class="section-title">
-          📋 左右並排比對表
-          <span class="badge badge-added">綠 ＝ B 新增</span>
-          <span class="badge badge-removed">紅 ＝ A 獨有</span>
-          <span class="badge badge-changed">黃 ＝ 儲格修改</span>
+          📋 工作表「${esc(sheetName)}」比對結果
+          <span class="badge badge-removed">紅＝A獨有</span>
+          <span class="badge badge-added">綠＝B獨有</span>
+          <span class="badge badge-changed">黃＝數值差異</span>
         </div>
         <div class="legend">
-          <div class="legend-item"><div class="legend-dot" style="background:rgba(52,211,153,0.3)"></div>B 新增行（整行綠色）</div>
-          <div class="legend-item"><div class="legend-dot" style="background:rgba(248,113,113,0.3)"></div>A 獨有行（整行紅色）</div>
-          <div class="legend-item"><div class="legend-dot" style="background:rgba(251,191,36,0.35)"></div>修改的儲格（舊值刪除線 → 新值加粗）</div>
-          <div class="legend-item"><div class="legend-dot" style="background:rgba(255,255,255,0.06)"></div>無差異（正常顯示）</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(248,113,113,.35)"></div>A 獨有 Item（整行紅色）</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(52,211,153,.35)"></div>B 獨有 Item（整行綠色）</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(251,191,36,.4)"></div>數值有差異（儲格黃色）</div>
+          <div class="legend-item" style="color:#f87171">▲ 金額增加</div>
+          <div class="legend-item" style="color:#34d399">▼ 金額減少</div>
         </div>
         <div class="compare-wrap">
           <table class="compare-table" id="compareTable">
             <thead>
-              <tr>${thRow1}</tr>
-              <tr>${thRow2}</tr>
+              <tr>${th1}</tr>
+              <tr>${th2}</tr>
             </thead>
             <tbody>${tbody}</tbody>
           </table>
         </div>
-        ${total === 0 ? '<div class="empty-state" style="margin-top:16px">✅ 兩個檔案內容完全相同，沒有差異！</div>' : ''}
       </div>
     `;
 
-    const resultsEl = document.getElementById('results');
-    resultsEl.innerHTML = html;
-    resultsEl.classList.remove('hidden');
+    const el = document.getElementById('results');
+    el.innerHTML = html;
+    el.classList.remove('hidden');
 
-    // Fix sticky position of second thead row after render
+    // Fix second sticky header row top offset
     requestAnimationFrame(() => {
       const thead = document.querySelector('#compareTable thead');
-      if (!thead) return;
-      const row1Height = thead.rows[0] ? thead.rows[0].getBoundingClientRect().height : 40;
-      Array.from(thead.rows[1]?.cells || []).forEach(th => {
-        th.style.top = row1Height + 'px';
-      });
+      if (!thead?.rows[1]) return;
+      const h = thead.rows[0].getBoundingClientRect().height;
+      Array.from(thead.rows[1].cells).forEach(th => th.style.top = h + 'px');
     });
+  }
+
+  // ── showAnalysis ──────────────────────────────────────────────
+  function showAnalysis(result, sheetName) {
+    const { added, removed, changed, headers } = result;
+    const total = added.length + removed.length + changed.length;
+    const colName = i => headers[i] ? `「${headers[i]}」` : `欄位 ${i - 1}`;
+
+    let s = '';
+    s += `📊 工作表「${sheetName}」差異摘要\n`;
+    if (total === 0) {
+      s += '兩個檔案此工作表的所有 Item 完全相同，無差異。\n\n';
+    } else {
+      s += `共 ${total} 個 Item 有差異：數值變動 ${changed.length} 個、A 獨有 ${removed.length} 個、B 獨有 ${added.length} 個。\n\n`;
+    }
+
+    // Changed items detail
+    if (changed.length > 0) {
+      s += '🔑 數值變動明細\n';
+      changed.slice(0, 12).forEach(item => {
+        s += `• [${item.category}] ${item.key}\n`;
+        item.colDiffs.forEach(d => {
+          const name = colName(d.col);
+          if (d.numA !== null && d.numB !== null) {
+            const diff = d.numB - d.numA;
+            const pct  = d.numA !== 0 ? (diff / Math.abs(d.numA) * 100).toFixed(1) : null;
+            const pctStr = pct !== null ? `${diff > 0 ? '+' : ''}${pct}%` : 'N/A';
+            s += `  ${name}：A=${fmtNum(d.numA)} → B=${fmtNum(d.numB)}（${fmtDiff(diff)}，${pctStr}）\n`;
+          } else {
+            s += `  ${name}：「${d.oldVal || '(空白)'}」→「${d.newVal || '(空白)'}」\n`;
+          }
+        });
+      });
+      if (changed.length > 12) s += `  … 還有 ${changed.length - 12} 個 Item 未列出\n`;
+      s += '\n';
+    }
+
+    // A-only
+    if (removed.length > 0) {
+      s += `⚠️ 僅 A 有的 Item（共 ${removed.length} 個）\n`;
+      removed.slice(0, 8).forEach(i => s += `• [${i.category}] ${i.key}\n`);
+      if (removed.length > 8) s += `• … 還有 ${removed.length - 8} 個\n`;
+      s += '\n';
+    }
+
+    // B-only
+    if (added.length > 0) {
+      s += `✅ 僅 B 有的 Item（共 ${added.length} 個）\n`;
+      added.slice(0, 8).forEach(i => s += `• [${i.category}] ${i.key}\n`);
+      if (added.length > 8) s += `• … 還有 ${added.length - 8} 個\n`;
+      s += '\n';
+    }
+
+    s += '💡 建議\n';
+    if (total > 0) {
+      if (changed.length > 0) s += '• 請核對黃色高亮欄位，確認數值差異原因。\n';
+      if (removed.length > 0) s += '• A 獨有的 Item 請確認是否需要補充到 B。\n';
+      if (added.length   > 0) s += '• B 新增的 Item 請確認報價來源是否正確。\n';
+    } else {
+      s += '• 此工作表資料完全一致，無需修正。\n';
+    }
+
+    document.getElementById('aiContent').innerHTML = `<div class="ai-summary">${s}</div>`;
   }
 </script>
 </body>
