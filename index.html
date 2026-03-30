@@ -91,7 +91,7 @@
       box-shadow: 0 8px 24px rgba(139,92,246,0.4);
     }
     .compare-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .results { max-width: 900px; margin: 0 auto; }
+    .results { max-width: 1600px; margin: 0 auto; }
     .section {
       background: rgba(255,255,255,0.03);
       border: 1px solid rgba(255,255,255,0.06);
@@ -106,6 +106,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
+      flex-wrap: wrap;
     }
     .badge {
       display: inline-flex;
@@ -115,32 +116,12 @@
       font-size: 0.75rem;
       font-weight: 600;
     }
-    .badge-added { background: rgba(52,211,153,0.15); color: #34d399; }
-    .badge-removed { background: rgba(248,113,113,0.15); color: #f87171; }
-    .badge-changed { background: rgba(251,191,36,0.15); color: #fbbf24; }
-    .badge-ai { background: rgba(139,92,246,0.15); color: #a78bfa; }
-    .diff-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    .diff-table th {
-      text-align: left;
-      padding: 8px 12px;
-      color: #64748b;
-      font-weight: 500;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-      font-size: 0.8rem;
-    }
-    .diff-table td {
-      padding: 10px 12px;
-      border-bottom: 1px solid rgba(255,255,255,0.04);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.8rem;
-    }
-    .diff-table tr:last-child td { border-bottom: none; }
-    .cell-added { color: #34d399; }
-    .cell-removed { color: #f87171; }
-    .cell-old { color: #f87171; text-decoration: line-through; opacity: 0.7; }
-    .cell-new { color: #34d399; }
+    .badge-added  { background: rgba(52,211,153,0.15);  color: #34d399; }
+    .badge-removed{ background: rgba(248,113,113,0.15); color: #f87171; }
+    .badge-changed{ background: rgba(251,191,36,0.15);  color: #fbbf24; }
+    .badge-ai     { background: rgba(139,92,246,0.15);  color: #a78bfa; }
     .ai-summary {
-      line-height: 1.8;
+      line-height: 1.9;
       color: #cbd5e1;
       white-space: pre-wrap;
       font-size: 0.9rem;
@@ -148,8 +129,7 @@
     .loading { text-align: center; padding: 32px; color: #64748b; }
     .loading-spinner {
       display: inline-block;
-      width: 32px;
-      height: 32px;
+      width: 32px; height: 32px;
       border: 3px solid rgba(139,92,246,0.3);
       border-top-color: #8b5cf6;
       border-radius: 50%;
@@ -159,23 +139,161 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .stats-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
     .stat-card {
-      flex: 1;
-      min-width: 100px;
+      flex: 1; min-width: 100px;
       background: rgba(255,255,255,0.03);
-      border-radius: 12px;
-      padding: 16px;
+      border-radius: 12px; padding: 16px;
       text-align: center;
       border: 1px solid rgba(255,255,255,0.06);
     }
     .stat-number {
-      font-size: 1.8rem;
-      font-weight: 700;
+      font-size: 1.8rem; font-weight: 700;
       font-family: 'JetBrains Mono', monospace;
     }
     .stat-label { font-size: 0.75rem; color: #64748b; margin-top: 4px; }
     .empty-state { text-align: center; padding: 16px; color: #475569; font-size: 0.85rem; }
     input[type="file"] { display: none; }
     .hidden { display: none; }
+
+    /* ── Legend ───────────────────────────────────────────── */
+    .legend {
+      display: flex; gap: 20px; flex-wrap: wrap;
+      margin-bottom: 14px; font-size: 0.78rem; color: #64748b;
+    }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-dot  { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+
+    /* ── Side-by-side comparison table ───────────────────── */
+    .compare-wrap {
+      overflow: auto;
+      border-radius: 8px;
+      max-height: 620px;
+      border: 1px solid rgba(255,255,255,0.07);
+    }
+    .compare-table {
+      border-collapse: collapse;
+      font-size: 0.8rem;
+      white-space: nowrap;
+      min-width: 100%;
+    }
+
+    /* Sticky header rows */
+    .compare-table thead th {
+      position: sticky;
+      z-index: 10;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    /* First header row (File A / File B labels) */
+    .compare-table thead tr:first-child th {
+      top: 0;
+      padding: 10px 14px;
+      font-weight: 700;
+      font-size: 0.82rem;
+    }
+    /* Second header row (column names) */
+    .compare-table thead tr:nth-child(2) th {
+      /* top is set by JS after render */
+      padding: 5px 12px;
+      font-weight: 500;
+      font-size: 0.73rem;
+      color: #94a3b8;
+      border-bottom: 2px solid rgba(255,255,255,0.12);
+    }
+
+    /* Row-number column */
+    .th-rownum {
+      background: #171c28 !important;
+      color: #475569 !important;
+      min-width: 52px; text-align: center;
+      position: sticky !important; left: 0;
+      z-index: 25 !important;
+    }
+    /* File A header */
+    .th-a {
+      background: rgba(12,32,62,0.97) !important;
+      color: #60a5fa !important;
+      text-align: center;
+      border-left: 2px solid rgba(96,165,250,0.35);
+    }
+    /* File B header */
+    .th-b {
+      background: rgba(8,38,28,0.97) !important;
+      color: #34d399 !important;
+      text-align: center;
+      border-left: 2px solid rgba(52,211,153,0.35);
+    }
+    /* Column-name sub-headers */
+    .th-col-a {
+      background: rgba(12,32,62,0.92) !important;
+      color: #7fb3f5 !important;
+      border-left: 1px solid rgba(96,165,250,0.12);
+      min-width: 100px;
+    }
+    .th-col-b {
+      background: rgba(8,38,28,0.92) !important;
+      color: #5ecba1 !important;
+      border-left: 1px solid rgba(52,211,153,0.12);
+      min-width: 100px;
+    }
+    /* Divider column */
+    .th-sep {
+      background: rgba(255,255,255,0.04) !important;
+      width: 6px; padding: 0 !important;
+      border: none !important;
+    }
+
+    /* Data cells */
+    .compare-table td {
+      padding: 6px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      max-width: 280px;
+      word-break: break-word;
+      white-space: normal;
+      vertical-align: top;
+    }
+    .td-rownum {
+      color: #475569; text-align: center;
+      font-size: 0.73rem;
+      font-family: 'JetBrains Mono', monospace;
+      position: sticky; left: 0;
+      background: #171c28; z-index: 5;
+      white-space: nowrap;
+    }
+    .td-a {
+      background: rgba(12,32,62,0.18);
+      border-left: 1px solid rgba(96,165,250,0.07);
+    }
+    .td-b {
+      background: rgba(8,38,28,0.18);
+      border-left: 1px solid rgba(52,211,153,0.07);
+    }
+    .td-sep { background: rgba(255,255,255,0.04); padding: 0; width: 6px; }
+
+    /* Row-level highlighting */
+    .row-added .td-a   { background: rgba(52,211,153,0.04) !important; color: #334155; }
+    .row-added .td-b   { background: rgba(52,211,153,0.13) !important; color: #34d399; }
+    .row-added .td-rownum { background: rgba(52,211,153,0.18) !important; color: #34d399; }
+    .row-removed .td-a { background: rgba(248,113,113,0.13) !important; color: #f87171; }
+    .row-removed .td-b { background: rgba(248,113,113,0.04) !important; color: #334155; }
+    .row-removed .td-rownum { background: rgba(248,113,113,0.18) !important; color: #f87171; }
+
+    /* Cell-level diff highlight */
+    .cell-diff-a {
+      background: rgba(251,191,36,0.18) !important;
+      color: #fb923c !important;
+      text-decoration: line-through;
+    }
+    .cell-diff-b {
+      background: rgba(251,191,36,0.28) !important;
+      color: #fbbf24 !important;
+      font-weight: 700;
+    }
+
+    /* Truncation notice */
+    .truncate-notice {
+      text-align: center; padding: 14px;
+      color: #64748b; font-size: 0.8rem;
+      background: rgba(255,255,255,0.02);
+    }
   </style>
 </head>
 <body>
@@ -226,25 +344,19 @@
     e.preventDefault();
     document.getElementById('zone' + n).classList.add('drag-over');
   }
-
   function handleDragLeave(n) {
     document.getElementById('zone' + n).classList.remove('drag-over');
   }
-
   function handleDrop(e, n) {
     e.preventDefault();
     document.getElementById('zone' + n).classList.remove('drag-over');
     const f = e.dataTransfer.files[0];
-    if (f && (f.name.endsWith('.xlsx') || f.name.endsWith('.xls'))) {
-      setFile(n, f);
-    }
+    if (f && (f.name.endsWith('.xlsx') || f.name.endsWith('.xls'))) setFile(n, f);
   }
-
   function handleFileChange(n) {
     const input = document.getElementById('file' + n);
     if (input.files[0]) setFile(n, input.files[0]);
   }
-
   function setFile(n, f) {
     files[n] = f;
     document.getElementById('zone' + n).classList.add('loaded');
@@ -262,8 +374,7 @@
         try {
           const wb = XLSX.read(e.target.result, { type: 'array' });
           const ws = wb.Sheets[wb.SheetNames[0]];
-          const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-          resolve(data);
+          resolve(XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }));
         } catch(err) { reject(err); }
       };
       reader.onerror = reject;
@@ -271,57 +382,130 @@
     });
   }
 
+  // Returns { rows, added, removed, changed, maxCols }
+  // rows[i] = { type:'same'|'added'|'removed'|'changed', rowNum, data1, data2, changedCols:Set }
+  // Row 0 (header) is excluded from diff; use data[0] separately as headers.
   function compareData(data1, data2) {
     const maxRows = Math.max(data1.length, data2.length);
-    const maxCols = Math.max(...data1.map(r=>r.length), ...data2.map(r=>r.length));
-    const added = [], removed = [], changed = [];
+    const maxCols = Math.max(
+      ...data1.map(r => r.length),
+      ...data2.map(r => r.length),
+      1
+    );
+    const rows = [], added = [], removed = [], changed = [];
 
-    for (let r = 0; r < maxRows; r++) {
-      const row1 = data1[r] || [];
-      const row2 = data2[r] || [];
-      if (r >= data1.length) { added.push({ row: r+1, data: row2 }); continue; }
-      if (r >= data2.length) { removed.push({ row: r+1, data: row1 }); continue; }
-      const rowChanges = [];
-      for (let c = 0; c < maxCols; c++) {
-        const v1 = String(row1[c] ?? '');
-        const v2 = String(row2[c] ?? '');
-        if (v1 !== v2) rowChanges.push({ col: c+1, old: v1, new: v2 });
+    for (let r = 1; r < maxRows; r++) {
+      const row1 = r < data1.length ? (data1[r] || []) : null;
+      const row2 = r < data2.length ? (data2[r] || []) : null;
+
+      if (row1 === null) {
+        rows.push({ type: 'added',   rowNum: r + 1, data1: null, data2: row2, changedCols: new Set() });
+        added.push({ row: r + 1, data: row2 });
+      } else if (row2 === null) {
+        rows.push({ type: 'removed', rowNum: r + 1, data1: row1, data2: null, changedCols: new Set() });
+        removed.push({ row: r + 1, data: row1 });
+      } else {
+        const changedCols = new Set();
+        const changes = [];
+        for (let c = 0; c < maxCols; c++) {
+          const v1 = String(row1[c] ?? '');
+          const v2 = String(row2[c] ?? '');
+          if (v1 !== v2) { changedCols.add(c); changes.push({ col: c + 1, old: v1, new: v2 }); }
+        }
+        if (changedCols.size > 0) {
+          rows.push({ type: 'changed', rowNum: r + 1, data1: row1, data2: row2, changedCols });
+          changed.push({ row: r + 1, changes });
+        } else {
+          rows.push({ type: 'same', rowNum: r + 1, data1: row1, data2: row2, changedCols: new Set() });
+        }
       }
-      if (rowChanges.length > 0) changed.push({ row: r+1, changes: rowChanges });
     }
-    return { added, removed, changed };
+    return { rows, added, removed, changed, maxCols };
   }
 
-  function showLocalAnalysis(diff) {
-    const total = diff.added.length + diff.removed.length + diff.changed.length;
-    let summary = '';
+  // Escape HTML special chars
+  function esc(v) {
+    return String(v ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
 
-    summary += '📊 整體差異摘要\n';
-    summary += `兩個檔案共有 ${total} 處差異：新增 ${diff.added.length} 行、刪除 ${diff.removed.length} 行、修改 ${diff.changed.length} 行。\n\n`;
+  function showLocalAnalysis(result, headers1, headers2) {
+    const { added, removed, changed } = result;
+    const total = added.length + removed.length + changed.length;
+    const headers = headers1.length >= headers2.length ? headers1 : headers2;
 
-    summary += '🔑 主要差異重點\n';
-    if (diff.added.length > 0) summary += `• 檔案 B 比檔案 A 多了 ${diff.added.length} 行新資料\n`;
-    if (diff.removed.length > 0) summary += `• 檔案 B 比檔案 A 少了 ${diff.removed.length} 行資料\n`;
-    if (diff.changed.length > 0) summary += `• 有 ${diff.changed.length} 行的內容被修改\n`;
-    if (total === 0) summary += '• 兩個檔案內容完全相同\n';
-    summary += '\n';
+    const colName = idx => {
+      const h = headers[idx];
+      return h ? `「${h}」` : `欄位 ${idx + 1}`;
+    };
 
-    summary += '⚠️ 需要特別注意\n';
-    if (diff.changed.length > 0) {
-      diff.changed.slice(0,3).forEach(row => {
-        row.changes.forEach(c => {
-          summary += `• 第 ${row.row} 行 欄位${c.col}：「${c.old}」→「${c.new}」\n`;
-        });
-      });
+    let s = '';
+
+    // 1. 整體差異摘要
+    s += '📊 整體差異摘要\n';
+    if (total === 0) {
+      s += '兩個檔案內容完全相同，無任何差異。\n\n';
+    } else {
+      s += `共發現 ${total} 處差異：新增 ${added.length} 行、刪除 ${removed.length} 行、修改 ${changed.length} 行。\n\n`;
     }
-    if (total === 0) summary += '• 無異常\n';
-    summary += '\n';
 
-    summary += '💡 建議\n';
-    if (total > 0) summary += '• 請仔細核對差異項目，確認修改是否符合預期。\n';
-    else summary += '• 兩份檔案一致，可以放心使用。\n';
+    // 2. 主要差異重點（含具體欄位值比對）
+    s += '🔑 主要差異重點\n';
+    if (changed.length > 0) {
+      changed.slice(0, 8).forEach(row => {
+        const diffs = row.changes.map(c => {
+          const name = colName(c.col - 1);
+          const numA = parseFloat(c.old), numB = parseFloat(c.new);
+          const isNum = !isNaN(numA) && !isNaN(numB) && c.old !== '' && c.new !== '';
+          const note = isNum
+            ? `（差異 ${numB - numA > 0 ? '+' : ''}${(numB - numA).toLocaleString()}）`
+            : '';
+          return `${name}：A=${c.old || '(空白)'} vs B=${c.new || '(空白)'}${note}`;
+        }).join('；');
+        s += `• 第 ${row.row} 行　${diffs}\n`;
+      });
+      if (changed.length > 8) s += `• … 還有 ${changed.length - 8} 行修改未列出\n`;
+    }
+    if (added.length   > 0) s += `• 檔案 B 新增了 ${added.length} 行（表格中綠色列）\n`;
+    if (removed.length > 0) s += `• 檔案 A 多出 ${removed.length} 行（表格中紅色列）\n`;
+    if (total === 0) s += '• 所有欄位與資料均一致\n';
+    s += '\n';
 
-    document.getElementById('aiContent').innerHTML = `<div class="ai-summary">${summary}</div>`;
+    // 3. A 多出的項目
+    if (removed.length > 0) {
+      s += '⚠️ 檔案 A 多出的項目（B 中已刪除）\n';
+      removed.slice(0, 5).forEach(row => {
+        const preview = (row.data || []).slice(0, 5).filter(v => String(v) !== '').join(' | ');
+        s += `• 第 ${row.row} 行：${preview || '(空白行)'}\n`;
+      });
+      if (removed.length > 5) s += `• … 還有 ${removed.length - 5} 行\n`;
+      s += '\n';
+    }
+
+    // 4. B 多出的項目
+    if (added.length > 0) {
+      s += '✅ 檔案 B 多出的項目（A 中沒有）\n';
+      added.slice(0, 5).forEach(row => {
+        const preview = (row.data || []).slice(0, 5).filter(v => String(v) !== '').join(' | ');
+        s += `• 第 ${row.row} 行：${preview || '(空白行)'}\n`;
+      });
+      if (added.length > 5) s += `• … 還有 ${added.length - 5} 行\n`;
+      s += '\n';
+    }
+
+    // 5. 建議
+    s += '💡 建議\n';
+    if (total > 0) {
+      if (removed.length > 0) s += '• 請確認 A 中被刪除的資料是否為刻意移除，避免資料遺失。\n';
+      if (added.length   > 0) s += '• 請確認 B 中新增的資料來源是否正確。\n';
+      if (changed.length > 0) s += '• 請核對修改欄位的異動原因是否符合預期。\n';
+    } else {
+      s += '• 兩份檔案完全一致，可以放心使用。\n';
+    }
+
+    document.getElementById('aiContent').innerHTML = `<div class="ai-summary">${s}</div>`;
   }
 
   async function startCompare() {
@@ -333,11 +517,13 @@
 
     try {
       const [data1, data2] = await Promise.all([parseExcel(files[1]), parseExcel(files[2])]);
-      const diff = compareData(data1, data2);
+      const headers1 = data1[0] || [];
+      const headers2 = data2[0] || [];
+      const result = compareData(data1, data2);
 
       document.getElementById('loadingEl').classList.add('hidden');
-      renderResults(diff);
-      showLocalAnalysis(diff);
+      renderResults(result, headers1, headers2);
+      showLocalAnalysis(result, headers1, headers2);
     } catch(err) {
       document.getElementById('loadingEl').classList.add('hidden');
       alert('讀取檔案失敗，請確認是有效的 Excel 檔案');
@@ -347,87 +533,113 @@
     btn.textContent = '🔍 開始比對';
   }
 
-  function renderResults(diff) {
-    const total = diff.added.length + diff.removed.length + diff.changed.length;
-    let html = `
+  function renderResults(result, headers1, headers2) {
+    const { rows, added, removed, changed, maxCols } = result;
+    const total = added.length + removed.length + changed.length;
+    const LIMIT = 300;
+    const displayRows = rows.slice(0, LIMIT);
+    const truncated = rows.length > LIMIT;
+
+    // Column header labels
+    const hA = Array.from({ length: maxCols }, (_, i) => esc(headers1[i] ?? `欄 ${i + 1}`));
+    const hB = Array.from({ length: maxCols }, (_, i) => esc(headers2[i] ?? `欄 ${i + 1}`));
+
+    // ── thead row 1: File A / File B labels ─────────────────
+    const thRow1 =
+      `<th class="th-rownum" rowspan="2">行</th>` +
+      `<th colspan="${maxCols}" class="th-a">📁 檔案 A</th>` +
+      `<th class="th-sep" rowspan="2"></th>` +
+      `<th colspan="${maxCols}" class="th-b">📁 檔案 B</th>`;
+
+    // ── thead row 2: column names ────────────────────────────
+    const thRow2 =
+      hA.map(h => `<th class="th-col-a">${h}</th>`).join('') +
+      `<th class="th-sep"></th>` +
+      hB.map(h => `<th class="th-col-b">${h}</th>`).join('');
+
+    // ── tbody ────────────────────────────────────────────────
+    let tbody = displayRows.map(row => {
+      const typeClass = row.type === 'added' ? 'row-added'
+                      : row.type === 'removed' ? 'row-removed'
+                      : '';
+      let tds = `<td class="td-rownum">${row.rowNum}</td>`;
+
+      // A side
+      for (let c = 0; c < maxCols; c++) {
+        const val = row.data1 != null ? esc(row.data1[c] ?? '') : '';
+        const cls = 'td-a' + (row.changedCols.has(c) ? ' cell-diff-a' : '');
+        tds += `<td class="${cls}">${val}</td>`;
+      }
+      tds += `<td class="td-sep"></td>`;
+      // B side
+      for (let c = 0; c < maxCols; c++) {
+        const val = row.data2 != null ? esc(row.data2[c] ?? '') : '';
+        const cls = 'td-b' + (row.changedCols.has(c) ? ' cell-diff-b' : '');
+        tds += `<td class="${cls}">${val}</td>`;
+      }
+
+      return `<tr class="${typeClass}">${tds}</tr>`;
+    }).join('');
+
+    if (truncated) {
+      tbody += `<tr><td colspan="${maxCols * 2 + 2}" class="truncate-notice">
+        ⚠️ 僅顯示前 ${LIMIT} 行，共 ${rows.length} 行資料
+      </td></tr>`;
+    }
+
+    // ── Assemble HTML ────────────────────────────────────────
+    const html = `
       <div class="stats-row">
-        <div class="stat-card"><div class="stat-number" style="color:#34d399">${diff.added.length}</div><div class="stat-label">新增行</div></div>
-        <div class="stat-card"><div class="stat-number" style="color:#f87171">${diff.removed.length}</div><div class="stat-label">刪除行</div></div>
-        <div class="stat-card"><div class="stat-number" style="color:#fbbf24">${diff.changed.length}</div><div class="stat-label">修改行</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:#34d399">${added.length}</div><div class="stat-label">新增行</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:#f87171">${removed.length}</div><div class="stat-label">刪除行</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:#fbbf24">${changed.length}</div><div class="stat-label">修改行</div></div>
         <div class="stat-card"><div class="stat-number" style="color:#60a5fa">${total}</div><div class="stat-label">總差異</div></div>
       </div>
 
       <div class="section">
         <div class="section-title">🤖 智慧分析 <span class="badge badge-ai">本地分析</span></div>
-        <div id="aiContent"><div class="loading"><div class="loading-spinner"></div><div>等待中...</div></div></div>
+        <div id="aiContent"><div class="loading"><div class="loading-spinner"></div><div>分析中...</div></div></div>
+      </div>
+
+      <div class="section" style="padding: 20px 24px;">
+        <div class="section-title">
+          📋 左右並排比對表
+          <span class="badge badge-added">綠 ＝ B 新增</span>
+          <span class="badge badge-removed">紅 ＝ A 獨有</span>
+          <span class="badge badge-changed">黃 ＝ 儲格修改</span>
+        </div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(52,211,153,0.3)"></div>B 新增行（整行綠色）</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(248,113,113,0.3)"></div>A 獨有行（整行紅色）</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(251,191,36,0.35)"></div>修改的儲格（舊值刪除線 → 新值加粗）</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(255,255,255,0.06)"></div>無差異（正常顯示）</div>
+        </div>
+        <div class="compare-wrap">
+          <table class="compare-table" id="compareTable">
+            <thead>
+              <tr>${thRow1}</tr>
+              <tr>${thRow2}</tr>
+            </thead>
+            <tbody>${tbody}</tbody>
+          </table>
+        </div>
+        ${total === 0 ? '<div class="empty-state" style="margin-top:16px">✅ 兩個檔案內容完全相同，沒有差異！</div>' : ''}
       </div>
     `;
-
-    if (diff.changed.length > 0) {
-      html += `
-        <div class="section">
-          <div class="section-title">✏️ 修改的內容 <span class="badge badge-changed">${diff.changed.length} 行</span></div>
-          <table class="diff-table">
-            <thead><tr><th>行號</th><th>欄位</th><th>檔案 A（舊）</th><th>檔案 B（新）</th></tr></thead>
-            <tbody>
-              ${diff.changed.slice(0,50).map(row =>
-                row.changes.map((c, ci) => `
-                  <tr>
-                    ${ci === 0 ? `<td rowspan="${row.changes.length}" style="color:#64748b">${row.row}</td>` : ''}
-                    <td style="color:#64748b">欄 ${c.col}</td>
-                    <td class="cell-old">${c.old || '(空白)'}</td>
-                    <td class="cell-new">${c.new || '(空白)'}</td>
-                  </tr>
-                `).join('')
-              ).join('')}
-            </tbody>
-          </table>
-        </div>`;
-    }
-
-    if (diff.added.length > 0) {
-      html += `
-        <div class="section">
-          <div class="section-title">➕ 新增的行 <span class="badge badge-added">${diff.added.length} 行</span></div>
-          <table class="diff-table">
-            <thead><tr><th>行號</th><th>內容</th></tr></thead>
-            <tbody>
-              ${diff.added.slice(0,20).map(row => `
-                <tr>
-                  <td style="color:#64748b">${row.row}</td>
-                  <td class="cell-added">${row.data.filter(Boolean).join(' | ')}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>`;
-    }
-
-    if (diff.removed.length > 0) {
-      html += `
-        <div class="section">
-          <div class="section-title">➖ 刪除的行 <span class="badge badge-removed">${diff.removed.length} 行</span></div>
-          <table class="diff-table">
-            <thead><tr><th>行號</th><th>內容</th></tr></thead>
-            <tbody>
-              ${diff.removed.slice(0,20).map(row => `
-                <tr>
-                  <td style="color:#64748b">${row.row}</td>
-                  <td class="cell-removed">${row.data.filter(Boolean).join(' | ')}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>`;
-    }
-
-    if (total === 0) {
-      html += `<div class="section"><div class="empty-state">✅ 兩個檔案內容完全相同，沒有差異！</div></div>`;
-    }
 
     const resultsEl = document.getElementById('results');
     resultsEl.innerHTML = html;
     resultsEl.classList.remove('hidden');
+
+    // Fix sticky position of second thead row after render
+    requestAnimationFrame(() => {
+      const thead = document.querySelector('#compareTable thead');
+      if (!thead) return;
+      const row1Height = thead.rows[0] ? thead.rows[0].getBoundingClientRect().height : 40;
+      Array.from(thead.rows[1]?.cells || []).forEach(th => {
+        th.style.top = row1Height + 'px';
+      });
+    });
   }
 </script>
 </body>
