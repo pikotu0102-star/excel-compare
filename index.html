@@ -156,7 +156,7 @@
     .th-item {
       background: #171c28 !important; color: #94a3b8 !important;
       min-width: 180px; text-align: left;
-      position: sticky !important; left: 80px; z-index: 22 !important;
+      position: sticky !important; left: 0; z-index: 22 !important;
       border-right: 2px solid rgba(255,255,255,.1);
     }
     /* Value column group header */
@@ -177,16 +177,16 @@
     /* ── Table cells ──────────────────────────────── */
     .compare-table td {
       padding: 6px 12px; border-bottom: 1px solid rgba(255,255,255,.04);
-      vertical-align: middle;
+      vertical-align: middle; white-space: nowrap;
     }
     .td-cat {
       color: #64748b; font-size: .75rem; white-space: nowrap;
       position: sticky; left: 0; background: #171c28; z-index: 5;
     }
     .td-item {
-      color: #e2e8f0; font-weight: 500; white-space: normal; word-break: break-word; max-width: 220px;
-      position: sticky; left: 80px; background: #171c28; z-index: 5;
-      border-right: 2px solid rgba(255,255,255,.07);
+      color: #e2e8f0; font-weight: 500; white-space: nowrap;
+      position: sticky; left: 0; background: #171c28; z-index: 5;
+      border-right: 2px solid rgba(255,255,255,.1); min-width: 180px; max-width: 300px;
     }
     .td-a    { background: rgba(12,32,62,.18); text-align: right; font-family: 'JetBrains Mono',monospace; border-left: 1px solid rgba(96,165,250,.07); }
     .td-b    { background: rgba(8,38,28,.18);  text-align: right; font-family: 'JetBrains Mono',monospace; border-left: 1px solid rgba(52,211,153,.07); }
@@ -379,50 +379,62 @@
     return XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
   }
 
-  // ── Core: detect numeric columns (cols 2+) ────────────────────
-  function detectNumericCols(data, headerLen) {
-    const numeric = new Set();
-    for (let c = 2; c < headerLen; c++) {
-      let numCnt = 0, total = 0;
-      for (let r = 1; r < Math.min(data.length, 20); r++) {
-        const v = data[r]?.[c];
-        if (v !== '' && v !== null && v !== undefined) {
-          total++;
-          if (parseNum(v) !== null) numCnt++;
-        }
-      }
-      if (total > 0 && numCnt / total >= 0.5) numeric.add(c);
-    }
-    return numeric;
+  // ── NRE Summary column mapping ────────────────────────────────
+  // Excel col B (idx 1) = Item name (key)
+  // Excel col C (idx 2) = Total NRE Cost
+  // Excel col E (idx 4) = HP Pay
+  const ITEM_IDX  = 1;
+  const NRE_IDX   = 2;
+  const HP_IDX    = 4;
+
+  // Skip blank rows and comment/note rows
+  function shouldSkip(row) {
+    if (!row || row.every(v => String(v ?? '').trim() === '')) return true;
+    const item = String(row[ITEM_IDX] ?? '').trim();
+    if (!item) return true;
+    if (item.startsWith('*')) return true;
+    if (item.toLowerCase().includes('will be paid')) return true;
+    if (item.toLowerCase().includes('note') && item.length < 10) return true;
+    return false;
   }
 
-  // ── Core: key-based comparison ────────────────────────────────
-  // col[0] = 分類(Category), col[1] = Item (key), col[2+] = values
-  function compareData(data1, data2) {
-    const h1 = data1[0] || [];
-    const h2 = data2[0] || [];
-    const headers = h1.length >= h2.length ? h1 : h2;
-    const maxCols = Math.max(h1.length, h2.length, 2);
-    const numericCols = detectNumericCols(
-      data1.length > data2.length ? data1 : data2,
-      maxCols
-    );
+  // Compute diff & pct for two numeric values
+  function calcDiff(nA, nB) {
+    if (nA === null || nB === null) return { diff: null, pct: null };
+    const diff = nB - nA;
+    const pct  = nA !== 0 ? (diff / Math.abs(nA)) * 100 : null;
+    return { diff, pct };
+  }
 
-    // Build maps: Item (col[1], trimmed) → entry
+  // ── Core: NRE Summary key-based comparison ────────────────────
+  // Key = Excel col B (Item name); compare cols C (NRE) and E (HP pay)
+  function compareData(data1, data2) {
+    // Try to read column labels from header rows (rows 0-2)
+    const findLabel = (data, colIdx) => {
+      for (let r = 0; r < Math.min(data.length, 3); r++) {
+        const v = String(data[r]?.[colIdx] ?? '').trim();
+        if (v) return v;
+      }
+      return null;
+    };
+    const nreLabel = findLabel(data1, NRE_IDX) || findLabel(data2, NRE_IDX) || 'Total NRE Cost';
+    const hpLabel  = findLabel(data1, HP_IDX)  || findLabel(data2, HP_IDX)  || 'HP Pay';
+
+    // Build maps: Item → { rowData, rowNum }
     const buildMap = (data) => {
       const m = new Map();
-      for (let r = 1; r < data.length; r++) {
+      for (let r = 0; r < data.length; r++) {
         const row = data[r] || [];
-        const key = String(row[1] ?? '').trim();
-        if (key && !m.has(key))
-          m.set(key, { category: String(row[0] ?? '').trim(), rowData: row, rowNum: r + 1 });
+        if (shouldSkip(row)) continue;
+        const key = String(row[ITEM_IDX] ?? '').trim();
+        if (key && !m.has(key)) m.set(key, { rowData: row, rowNum: r + 1 });
       }
       return m;
     };
     const map1 = buildMap(data1);
     const map2 = buildMap(data2);
 
-    // Ordered key list: A order first, then B-only
+    // Key order: A first, then B-only
     const allKeys = [...map1.keys()];
     for (const k of map2.keys()) if (!map1.has(k)) allKeys.push(k);
 
@@ -432,47 +444,56 @@
       const e1 = map1.get(key);
       const e2 = map2.get(key);
 
+      const getVals = (entry, idx) => {
+        const raw = entry ? String(entry.rowData[idx] ?? '').trim() : '';
+        return { raw, num: parseNum(raw) };
+      };
+
       if (!e1) {
-        // B only
-        rows.push({ type:'added', key, category:e2.category,
-                    rowNumA:null, rowNumB:e2.rowNum,
-                    data1:null, data2:e2.rowData, changedCols:new Set(), colDiffs:[] });
-        added.push({ key, category:e2.category, data:e2.rowData });
+        // B only (added)
+        const nre = getVals(e2, NRE_IDX);
+        const hp  = getVals(e2, HP_IDX);
+        const r = { type:'added', key, rowNumA:null, rowNumB:e2.rowNum,
+                    nreA:null, nreB:nre.num, rawNreA:'', rawNreB:nre.raw,
+                    hpA:null,  hpB:hp.num,  rawHpA:'',  rawHpB:hp.raw,
+                    ...calcDiff(null, nre.num), hpDiff:null, hpPct:null };
+        rows.push(r);
+        added.push({ key, nreB:nre.num, hpB:hp.num });
 
       } else if (!e2) {
-        // A only
-        rows.push({ type:'removed', key, category:e1.category,
-                    rowNumA:e1.rowNum, rowNumB:null,
-                    data1:e1.rowData, data2:null, changedCols:new Set(), colDiffs:[] });
-        removed.push({ key, category:e1.category, data:e1.rowData });
+        // A only (removed)
+        const nre = getVals(e1, NRE_IDX);
+        const hp  = getVals(e1, HP_IDX);
+        const r = { type:'removed', key, rowNumA:e1.rowNum, rowNumB:null,
+                    nreA:nre.num, nreB:null, rawNreA:nre.raw, rawNreB:'',
+                    hpA:hp.num,   hpB:null,  rawHpA:hp.raw,   rawHpB:'',
+                    diff:null, pct:null, hpDiff:null, hpPct:null };
+        rows.push(r);
+        removed.push({ key, nreA:nre.num, hpA:hp.num });
 
       } else {
-        // Both — compare col by col (starting from col 2)
-        const changedCols = new Set();
-        const colDiffs = [];
-        for (let c = 2; c < maxCols; c++) {
-          const v1 = String(e1.rowData[c] ?? '').trim();
-          const v2 = String(e2.rowData[c] ?? '').trim();
-          if (v1 !== v2) {
-            changedCols.add(c);
-            const nA = parseNum(v1), nB = parseNum(v2);
-            colDiffs.push({ col:c, oldVal:v1, newVal:v2, numA:nA, numB:nB });
-          }
-        }
-        if (changedCols.size > 0) {
-          rows.push({ type:'changed', key, category:e1.category,
-                      rowNumA:e1.rowNum, rowNumB:e2.rowNum,
-                      data1:e1.rowData, data2:e2.rowData, changedCols, colDiffs });
-          changed.push({ key, category:e1.category, colDiffs });
-        } else {
-          rows.push({ type:'same', key, category:e1.category,
-                      rowNumA:e1.rowNum, rowNumB:e2.rowNum,
-                      data1:e1.rowData, data2:e2.rowData, changedCols:new Set(), colDiffs:[] });
-        }
+        // Both — compare NRE and HP
+        const nre1 = getVals(e1, NRE_IDX), nre2 = getVals(e2, NRE_IDX);
+        const hp1  = getVals(e1, HP_IDX),  hp2  = getVals(e2, HP_IDX);
+        const { diff: nreDiff, pct: nrePct } = calcDiff(nre1.num, nre2.num);
+        const { diff: hpDiff,  pct: hpPct  } = calcDiff(hp1.num,  hp2.num);
+        const hasNumDiff = (nreDiff !== null && nreDiff !== 0) ||
+                           (hpDiff  !== null && hpDiff  !== 0);
+        const rawsDiffer = nre1.raw !== nre2.raw || hp1.raw !== hp2.raw;
+        const type = (hasNumDiff || rawsDiffer) ? 'changed' : 'same';
+
+        const r = { type, key, rowNumA:e1.rowNum, rowNumB:e2.rowNum,
+                    nreA:nre1.num, nreB:nre2.num, rawNreA:nre1.raw, rawNreB:nre2.raw,
+                    hpA:hp1.num,   hpB:hp2.num,   rawHpA:hp1.raw,   rawHpB:hp2.raw,
+                    nreDiff, nrePct, hpDiff, hpPct };
+        rows.push(r);
+        if (type === 'changed') changed.push({ key, nreDiff, nrePct, hpDiff, hpPct,
+                                               nreA:nre1.num, nreB:nre2.num,
+                                               hpA:hp1.num,   hpB:hp2.num });
       }
     }
 
-    return { rows, added, removed, changed, maxCols, headers, numericCols };
+    return { rows, added, removed, changed, nreLabel, hpLabel };
   }
 
   // ── startCompare ──────────────────────────────────────────────
@@ -504,69 +525,50 @@
 
   // ── renderResults ─────────────────────────────────────────────
   function renderResults(result, sheetName) {
-    const { rows, added, removed, changed, maxCols, headers, numericCols } = result;
+    const { rows, added, removed, changed, nreLabel, hpLabel } = result;
     const total = added.length + removed.length + changed.length;
-    const valueCols = Array.from({ length: Math.max(maxCols - 2, 0) }, (_, i) => i + 2);
     const LIMIT = 500;
 
-    // ── thead row 1 ────────────────────────────────────
-    let th1 = `<th class="th-cat"  rowspan="2">分類</th>` +
-              `<th class="th-item" rowspan="2">Item</th>`;
-    for (const c of valueCols) {
-      const label = esc(headers[c] ?? `欄位 ${c - 1}`);
-      if (numericCols.has(c)) {
-        th1 += `<th colspan="4" class="th-valcol">${label}</th>`;
-      } else {
-        th1 += `<th colspan="2" class="th-valcol">${label}</th>`;
-      }
-    }
-
-    // ── thead row 2 ────────────────────────────────────
-    let th2 = '';
-    for (const c of valueCols) {
-      if (numericCols.has(c)) {
-        th2 += `<th class="th-val-a">A（舊）</th><th class="th-val-b">B（新）</th>` +
-               `<th class="th-diff">差異額</th><th class="th-pct">差異%</th>`;
-      } else {
-        th2 += `<th class="th-text-a">A（舊）</th><th class="th-text-b">B（新）</th>`;
-      }
-    }
+    // Fixed 9-column table: Item | NRE×4 | HP×4
+    const th1 =
+      `<th class="th-item" rowspan="2">Item</th>` +
+      `<th colspan="4" class="th-valcol">${esc(nreLabel)}</th>` +
+      `<th colspan="4" class="th-valcol">${esc(hpLabel)}</th>`;
+    const th2 =
+      `<th class="th-val-a">A（舊）</th><th class="th-val-b">B（新）</th><th class="th-diff">差異額</th><th class="th-pct">差異%</th>` +
+      `<th class="th-val-a">A（舊）</th><th class="th-val-b">B（新）</th><th class="th-diff">差異額</th><th class="th-pct">差異%</th>`;
 
     // ── tbody ──────────────────────────────────────────
     const displayRows = rows.slice(0, LIMIT);
     let tbody = displayRows.map(row => {
-      const cls = row.type === 'added' ? 'row-added' : row.type === 'removed' ? 'row-removed' : '';
-      let tds = `<td class="td-cat">${esc(row.category)}</td><td class="td-item">${esc(row.key)}</td>`;
+      const typeCls = row.type === 'added' ? 'row-added' : row.type === 'removed' ? 'row-removed' : '';
+      const isChanged = row.type === 'changed';
+      const itemCls = `td-item${isChanged ? ' cell-diff' : ''}`;
 
-      for (const c of valueCols) {
-        const rawA = row.data1 ? String(row.data1[c] ?? '') : '';
-        const rawB = row.data2 ? String(row.data2[c] ?? '') : '';
-        const isDiff = row.changedCols.has(c);
-        const diffCls = isDiff ? ' cell-diff' : '';
+      // NRE columns
+      const nreDirCls = row.nreDiff === null ? '' : row.nreDiff > 0 ? ' diff-up' : row.nreDiff < 0 ? ' diff-down' : ' diff-zero';
+      const nreCellCls = isChanged && row.nreDiff !== null && row.nreDiff !== 0 ? ' cell-diff' : '';
+      // HP columns
+      const hpDirCls = row.hpDiff === null ? '' : row.hpDiff > 0 ? ' diff-up' : row.hpDiff < 0 ? ' diff-down' : ' diff-zero';
+      const hpCellCls = isChanged && row.hpDiff !== null && row.hpDiff !== 0 ? ' cell-diff' : '';
 
-        if (numericCols.has(c)) {
-          const nA = parseNum(rawA), nB = parseNum(rawB);
-          const diff = (nA !== null && nB !== null) ? nB - nA : null;
-          const pct  = (diff !== null && nA !== 0)  ? (diff / Math.abs(nA)) * 100 : null;
-          const dirCls = diff === null ? '' : diff > 0 ? ' diff-up' : diff < 0 ? ' diff-down' : ' diff-zero';
-          tds += `<td class="td-a${diffCls}">${fmtNum(rawA)}</td>`;
-          tds += `<td class="td-b${diffCls}">${fmtNum(rawB)}</td>`;
-          tds += `<td class="td-diff${dirCls}${isDiff ? ' cell-diff' : ''}">${esc(fmtDiff(diff))}</td>`;
-          tds += `<td class="td-pct${dirCls}${isDiff  ? ' cell-diff' : ''}">${esc(fmtPct(pct))}</td>`;
-        } else {
-          tds += `<td class="td-text-a${diffCls}">${esc(rawA)}</td>`;
-          tds += `<td class="td-text-b${diffCls}">${esc(rawB)}</td>`;
-        }
-      }
-      return `<tr class="${cls}">${tds}</tr>`;
+      return `<tr class="${typeCls}">
+        <td class="${itemCls}">${esc(row.key)}</td>
+        <td class="td-a${nreCellCls}">${esc(fmtNum(row.rawNreA))}</td>
+        <td class="td-b${nreCellCls}">${esc(fmtNum(row.rawNreB))}</td>
+        <td class="td-diff${nreDirCls}${nreCellCls}">${esc(fmtDiff(row.nreDiff))}</td>
+        <td class="td-pct${nreDirCls}${nreCellCls}">${esc(fmtPct(row.nrePct))}</td>
+        <td class="td-a${hpCellCls}">${esc(fmtNum(row.rawHpA))}</td>
+        <td class="td-b${hpCellCls}">${esc(fmtNum(row.rawHpB))}</td>
+        <td class="td-diff${hpDirCls}${hpCellCls}">${esc(fmtDiff(row.hpDiff))}</td>
+        <td class="td-pct${hpDirCls}${hpCellCls}">${esc(fmtPct(row.hpPct))}</td>
+      </tr>`;
     }).join('');
 
-    // Fallback / truncation
-    const totalCols = 2 + valueCols.reduce((a, c) => a + (numericCols.has(c) ? 4 : 2), 0);
     if (rows.length === 0) {
-      tbody = `<tr><td colspan="${totalCols}" class="truncate-notice">（此工作表無可比對的 Item 資料）</td></tr>`;
+      tbody = `<tr><td colspan="9" class="truncate-notice">（此工作表無可比對的 Item 資料）</td></tr>`;
     } else if (rows.length > LIMIT) {
-      tbody += `<tr><td colspan="${totalCols}" class="truncate-notice">⚠️ 僅顯示前 ${LIMIT} 行，共 ${rows.length} 筆</td></tr>`;
+      tbody += `<tr><td colspan="9" class="truncate-notice">⚠️ 僅顯示前 ${LIMIT} 筆，共 ${rows.length} 筆</td></tr>`;
     }
 
     // ── Assemble ───────────────────────────────────────
@@ -614,7 +616,7 @@
     el.innerHTML = html;
     el.classList.remove('hidden');
 
-    // Fix second sticky header row top offset
+    // Fix sticky second-header top offset
     requestAnimationFrame(() => {
       const thead = document.querySelector('#compareTable thead');
       if (!thead?.rows[1]) return;
@@ -625,9 +627,8 @@
 
   // ── showAnalysis ──────────────────────────────────────────────
   function showAnalysis(result, sheetName) {
-    const { added, removed, changed, headers } = result;
+    const { added, removed, changed, nreLabel, hpLabel } = result;
     const total = added.length + removed.length + changed.length;
-    const colName = i => headers[i] ? `「${headers[i]}」` : `欄位 ${i - 1}`;
 
     let s = '';
     s += `📊 工作表「${sheetName}」差異摘要\n`;
@@ -637,48 +638,43 @@
       s += `共 ${total} 個 Item 有差異：數值變動 ${changed.length} 個、A 獨有 ${removed.length} 個、B 獨有 ${added.length} 個。\n\n`;
     }
 
-    // Changed items detail
-    if (changed.length > 0) {
-      s += '🔑 數值變動明細\n';
-      changed.slice(0, 12).forEach(item => {
-        s += `• [${item.category}] ${item.key}\n`;
-        item.colDiffs.forEach(d => {
-          const name = colName(d.col);
-          if (d.numA !== null && d.numB !== null) {
-            const diff = d.numB - d.numA;
-            const pct  = d.numA !== 0 ? (diff / Math.abs(d.numA) * 100).toFixed(1) : null;
-            const pctStr = pct !== null ? `${diff > 0 ? '+' : ''}${pct}%` : 'N/A';
-            s += `  ${name}：A=${fmtNum(d.numA)} → B=${fmtNum(d.numB)}（${fmtDiff(diff)}，${pctStr}）\n`;
-          } else {
-            s += `  ${name}：「${d.oldVal || '(空白)'}」→「${d.newVal || '(空白)'}」\n`;
-          }
-        });
+    // Changed items: format "Item：A=$X vs B=$Y（差$Z，+X%）"
+    const numericChanges = changed.filter(i => i.nreDiff !== null || i.hpDiff !== null);
+    if (numericChanges.length > 0) {
+      s += `🔑 ${nreLabel} 變動明細\n`;
+      numericChanges.filter(i => i.nreDiff !== null && i.nreDiff !== 0).slice(0, 15).forEach(i => {
+        const pctStr = i.nrePct !== null ? `${i.nrePct > 0 ? '+' : ''}${i.nrePct.toFixed(1)}%` : 'N/A';
+        s += `• ${i.key}：A=$${fmtNum(i.nreA)} vs B=$${fmtNum(i.nreB)}（差 $${fmtDiff(i.nreDiff)}，${pctStr}）\n`;
       });
-      if (changed.length > 12) s += `  … 還有 ${changed.length - 12} 個 Item 未列出\n`;
+      s += '\n';
+
+      s += `🔑 ${hpLabel} 變動明細\n`;
+      numericChanges.filter(i => i.hpDiff !== null && i.hpDiff !== 0).slice(0, 15).forEach(i => {
+        const pctStr = i.hpPct !== null ? `${i.hpPct > 0 ? '+' : ''}${i.hpPct.toFixed(1)}%` : 'N/A';
+        s += `• ${i.key}：A=$${fmtNum(i.hpA)} vs B=$${fmtNum(i.hpB)}（差 $${fmtDiff(i.hpDiff)}，${pctStr}）\n`;
+      });
       s += '\n';
     }
 
-    // A-only
     if (removed.length > 0) {
       s += `⚠️ 僅 A 有的 Item（共 ${removed.length} 個）\n`;
-      removed.slice(0, 8).forEach(i => s += `• [${i.category}] ${i.key}\n`);
+      removed.slice(0, 8).forEach(i => s += `• ${i.key}（NRE: $${fmtNum(i.nreA)}，HP: $${fmtNum(i.hpA)}）\n`);
       if (removed.length > 8) s += `• … 還有 ${removed.length - 8} 個\n`;
       s += '\n';
     }
 
-    // B-only
     if (added.length > 0) {
       s += `✅ 僅 B 有的 Item（共 ${added.length} 個）\n`;
-      added.slice(0, 8).forEach(i => s += `• [${i.category}] ${i.key}\n`);
+      added.slice(0, 8).forEach(i => s += `• ${i.key}（NRE: $${fmtNum(i.nreB)}，HP: $${fmtNum(i.hpB)}）\n`);
       if (added.length > 8) s += `• … 還有 ${added.length - 8} 個\n`;
       s += '\n';
     }
 
     s += '💡 建議\n';
     if (total > 0) {
-      if (changed.length > 0) s += '• 請核對黃色高亮欄位，確認數值差異原因。\n';
-      if (removed.length > 0) s += '• A 獨有的 Item 請確認是否需要補充到 B。\n';
-      if (added.length   > 0) s += '• B 新增的 Item 請確認報價來源是否正確。\n';
+      if (numericChanges.length > 0) s += '• 請核對黃色高亮欄位，確認差異原因。\n';
+      if (removed.length > 0) s += '• A 獨有的 Item 請確認是否遺漏。\n';
+      if (added.length   > 0) s += '• B 新增的 Item 請確認報價來源正確。\n';
     } else {
       s += '• 此工作表資料完全一致，無需修正。\n';
     }
