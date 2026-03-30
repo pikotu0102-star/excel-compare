@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Excel 智慧比對工具</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+    .app {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0f1117 0%, #1a1f2e 50%, #0f1117 100%);
+      padding: 32px 24px;
+    }
+    .header { text-align: center; margin-bottom: 40px; }
+    .header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa, #34d399);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+    }
+    .header p { color: #64748b; font-size: 0.9rem; }
+    .upload-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .upload-zone {
+      border: 2px dashed #2d3748;
+      border-radius: 16px;
+      padding: 32px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: rgba(255,255,255,0.02);
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: #60a5fa;
+      background: rgba(96,165,250,0.05);
+    }
+    .upload-zone.loaded {
+      border-color: #34d399;
+      background: rgba(52,211,153,0.05);
+    }
+    .upload-icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .upload-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #94a3b8;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .upload-name {
+      font-size: 0.85rem;
+      color: #34d399;
+      font-family: 'JetBrains Mono', monospace;
+      margin-top: 8px;
+      word-break: break-all;
+    }
+    .upload-hint { font-size: 0.8rem; color: #475569; margin-top: 4px; }
+    .compare-btn {
+      display: block;
+      margin: 0 auto 32px;
+      padding: 14px 48px;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      color: white;
+      border: none;
+      border-radius: 50px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-family: 'Noto Sans TC', sans-serif;
+    }
+    .compare-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(139,92,246,0.4);
+    }
+    .compare-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .results { max-width: 900px; margin: 0 auto; }
+    .section {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .section-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-added { background: rgba(52,211,153,0.15); color: #34d399; }
+    .badge-removed { background: rgba(248,113,113,0.15); color: #f87171; }
+    .badge-changed { background: rgba(251,191,36,0.15); color: #fbbf24; }
+    .badge-ai { background: rgba(139,92,246,0.15); color: #a78bfa; }
+    .diff-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .diff-table th {
+      text-align: left;
+      padding: 8px 12px;
+      color: #64748b;
+      font-weight: 500;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      font-size: 0.8rem;
+    }
+    .diff-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+    }
+    .diff-table tr:last-child td { border-bottom: none; }
+    .cell-added { color: #34d399; }
+    .cell-removed { color: #f87171; }
+    .cell-old { color: #f87171; text-decoration: line-through; opacity: 0.7; }
+    .cell-new { color: #34d399; }
+    .ai-summary {
+      line-height: 1.8;
+      color: #cbd5e1;
+      white-space: pre-wrap;
+      font-size: 0.9rem;
+    }
+    .loading { text-align: center; padding: 32px; color: #64748b; }
+    .loading-spinner {
+      display: inline-block;
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(139,92,246,0.3);
+      border-top-color: #8b5cf6;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .stats-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .stat-card {
+      flex: 1;
+      min-width: 100px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .stat-number {
+      font-size: 1.8rem;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .stat-label { font-size: 0.75rem; color: #64748b; margin-top: 4px; }
+    .empty-state { text-align: center; padding: 16px; color: #475569; font-size: 0.85rem; }
+    input[type="file"] { display: none; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>📊 Excel 智慧比對工具</h1>
+    <p>上傳兩個 Excel 檔案，AI 自動分析並整理差異重點</p>
+  </div>
+
+  <div class="upload-grid">
+    <label class="upload-zone" id="zone1"
+      ondragover="handleDragOver(event,1)"
+      ondragleave="handleDragLeave(1)"
+      ondrop="handleDrop(event,1)">
+      <input type="file" id="file1" accept=".xlsx,.xls" onchange="handleFileChange(1)">
+      <div class="upload-icon" id="icon1">📄</div>
+      <div class="upload-label">檔案 A</div>
+      <div class="upload-name hidden" id="name1"></div>
+      <div class="upload-hint" id="hint1">點擊或拖曳 Excel 檔案到此處</div>
+    </label>
+
+    <label class="upload-zone" id="zone2"
+      ondragover="handleDragOver(event,2)"
+      ondragleave="handleDragLeave(2)"
+      ondrop="handleDrop(event,2)">
+      <input type="file" id="file2" accept=".xlsx,.xls" onchange="handleFileChange(2)">
+      <div class="upload-icon" id="icon2">📄</div>
+      <div class="upload-label">檔案 B</div>
+      <div class="upload-name hidden" id="name2"></div>
+      <div class="upload-hint" id="hint2">點擊或拖曳 Excel 檔案到此處</div>
+    </label>
+  </div>
+
+  <button class="compare-btn" id="compareBtn" onclick="startCompare()" disabled>🔍 開始比對</button>
+
+  <div id="loadingEl" class="loading hidden">
+    <div class="loading-spinner"></div>
+    <div>正在比對資料...</div>
+  </div>
+
+  <div id="results" class="results hidden"></div>
+</div>
+
+<script>
+  let files = { 1: null, 2: null };
+
+  function handleDragOver(e, n) {
+    e.preventDefault();
+    document.getElementById('zone' + n).classList.add('drag-over');
+  }
+
+  function handleDragLeave(n) {
+    document.getElementById('zone' + n).classList.remove('drag-over');
+  }
+
+  function handleDrop(e, n) {
+    e.preventDefault();
+    document.getElementById('zone' + n).classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f && (f.name.endsWith('.xlsx') || f.name.endsWith('.xls'))) {
+      setFile(n, f);
+    }
+  }
+
+  function handleFileChange(n) {
+    const input = document.getElementById('file' + n);
+    if (input.files[0]) setFile(n, input.files[0]);
+  }
+
+  function setFile(n, f) {
+    files[n] = f;
+    document.getElementById('zone' + n).classList.add('loaded');
+    document.getElementById('icon' + n).textContent = '✅';
+    document.getElementById('name' + n).textContent = f.name;
+    document.getElementById('name' + n).classList.remove('hidden');
+    document.getElementById('hint' + n).classList.add('hidden');
+    document.getElementById('compareBtn').disabled = !(files[1] && files[2]);
+  }
+
+  function parseExcel(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const wb = XLSX.read(e.target.result, { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          resolve(data);
+        } catch(err) { reject(err); }
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  function compareData(data1, data2) {
+    const maxRows = Math.max(data1.length, data2.length);
+    const maxCols = Math.max(...data1.map(r=>r.length), ...data2.map(r=>r.length));
+    const added = [], removed = [], changed = [];
+
+    for (let r = 0; r < maxRows; r++) {
+      const row1 = data1[r] || [];
+      const row2 = data2[r] || [];
+      if (r >= data1.length) { added.push({ row: r+1, data: row2 }); continue; }
+      if (r >= data2.length) { removed.push({ row: r+1, data: row1 }); continue; }
+      const rowChanges = [];
+      for (let c = 0; c < maxCols; c++) {
+        const v1 = String(row1[c] ?? '');
+        const v2 = String(row2[c] ?? '');
+        if (v1 !== v2) rowChanges.push({ col: c+1, old: v1, new: v2 });
+      }
+      if (rowChanges.length > 0) changed.push({ row: r+1, changes: rowChanges });
+    }
+    return { added, removed, changed };
+  }
+
+  async function callAI(diff, headers1, headers2) {
+    const summary = `
+檔案A標題列: ${JSON.stringify(headers1)}
+檔案B標題列: ${JSON.stringify(headers2)}
+新增行數: ${diff.added.length}
+刪除行數: ${diff.removed.length}
+修改行數: ${diff.changed.length}
+新增資料範例(前3筆): ${diff.added.slice(0,3).map(r=>`第${r.row}行: ${JSON.stringify(r.data)}`).join('\n')}
+刪除資料範例(前3筆): ${diff.removed.slice(0,3).map(r=>`第${r.row}行: ${JSON.stringify(r.data)}`).join('\n')}
+修改資料範例(前5筆): ${diff.changed.slice(0,5).map(r=>`第${r.row}行: ${r.changes.map(c=>`欄位${c.col}: "${c.old}"→"${c.new}"`).join(', ')}`).join('\n')}
+    `.trim();
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: `你是專業資料分析師，請用繁體中文整理以下兩個Excel檔案的比對結果：
+1. 📊 整體差異摘要
+2. 🔑 主要差異重點（條列式）
+3. ⚠️ 需要特別注意的項目
+4. 💡 建議
+
+資料比對結果：\n${summary}`
+        }]
+      })
+    });
+    const data = await res.json();
+    return data.content?.[0]?.text || '無法取得 AI 分析結果';
+  }
+
+  async function startCompare() {
+    const btn = document.getElementById('compareBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ 比對中...';
+    document.getElementById('loadingEl').classList.remove('hidden');
+    document.getElementById('results').classList.add('hidden');
+
+    try {
+      const [data1, data2] = await Promise.all([parseExcel(files[1]), parseExcel(files[2])]);
+      const diff = compareData(data1, data2);
+      const headers1 = data1[0] || [];
+      const headers2 = data2[0] || [];
+
+      document.getElementById('loadingEl').classList.add('hidden');
+      renderResults(diff);
+
+      // AI分析
+      const aiEl = document.getElementById('aiContent');
+      aiEl.innerHTML = '<div class="loading"><div class="loading-spinner"></div><div>AI 正在分析差異...</div></div>';
+      try {
+        const summary = await callAI(diff, headers1, headers2);
+        aiEl.innerHTML = `<div class="ai-summary">${summary}</div>`;
+      } catch {
+        aiEl.innerHTML = '<div class="ai-summary">AI 分析暫時無法使用，請查看下方詳細比對結果。</div>';
+      }
+    } catch(err) {
+      document.getElementById('loadingEl').classList.add('hidden');
+      alert('讀取檔案失敗，請確認是有效的 Excel 檔案');
+    }
+
+    btn.disabled = false;
+    btn.textContent = '🔍 開始比對';
+  }
+
+  function renderResults(diff) {
+    const total = diff.added.length + diff.removed.length + diff.changed.length;
+    let html = `
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-number" style="color:#34d399">${diff.added.length}</div><div class="stat-label">新增行</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:#f87171">${diff.removed.length}</div><div class="stat-label">刪除行</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:#fbbf24">${diff.changed.length}</div><div class="stat-label">修改行</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:#60a5fa">${total}</div><div class="stat-label">總差異</div></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">🤖 AI 智慧分析 <span class="badge badge-ai">Claude AI</span></div>
+        <div id="aiContent"><div class="loading"><div class="loading-spinner"></div><div>等待中...</div></div></div>
+      </div>
+    `;
+
+    if (diff.changed.length > 0) {
+      html += `
+        <div class="section">
+          <div class="section-title">✏️ 修改的內容 <span class="badge badge-changed">${diff.changed.length} 行</span></div>
+          <table class="diff-table">
+            <thead><tr><th>行號</th><th>欄位</th><th>檔案 A（舊）</th><th>檔案 B（新）</th></tr></thead>
+            <tbody>
+              ${diff.changed.slice(0,50).map(row =>
+                row.changes.map((c, ci) => `
+                  <tr>
+                    ${ci === 0 ? `<td rowspan="${row.changes.length}" style="color:#64748b">${row.row}</td>` : ''}
+                    <td style="color:#64748b">欄 ${c.col}</td>
+                    <td class="cell-old">${c.old || '(空白)'}</td>
+                    <td class="cell-new">${c.new || '(空白)'}</td>
+                  </tr>
+                `).join('')
+              ).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    }
+
+    if (diff.added.length > 0) {
+      html += `
+        <div class="section">
+          <div class="section-title">➕ 新增的行 <span class="badge badge-added">${diff.added.length} 行</span></div>
+          <table class="diff-table">
+            <thead><tr><th>行號</th><th>內容</th></tr></thead>
+            <tbody>
+              ${diff.added.slice(0,20).map(row => `
+                <tr>
+                  <td style="color:#64748b">${row.row}</td>
+                  <td class="cell-added">${row.data.filter(Boolean).join(' | ')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    }
+
+    if (diff.removed.length > 0) {
+      html += `
+        <div class="section">
+          <div class="section-title">➖ 刪除的行 <span class="badge badge-removed">${diff.removed.length} 行</span></div>
+          <table class="diff-table">
+            <thead><tr><th>行號</th><th>內容</th></tr></thead>
+            <tbody>
+              ${diff.removed.slice(0,20).map(row => `
+                <tr>
+                  <td style="color:#64748b">${row.row}</td>
+                  <td class="cell-removed">${row.data.filter(Boolean).join(' | ')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    }
+
+    if (total === 0) {
+      html += `<div class="section"><div class="empty-state">✅ 兩個檔案內容完全相同，沒有差異！</div></div>`;
+    }
+
+    const resultsEl = document.getElementById('results');
+    resultsEl.innerHTML = html;
+    resultsEl.classList.remove('hidden');
+  }
+</script>
+</body>
+</html>
