@@ -383,45 +383,78 @@
     });
   }
 
-  // Returns { rows, added, removed, changed, maxCols }
-  // rows[i] = { type:'same'|'added'|'removed'|'changed', rowNum, data1, data2, changedCols:Set }
-  // Row 0 (header) is excluded from diff; use data[0] separately as headers.
+  // Key-based comparison using the first column as a unique identifier.
+  // Row 0 is the header row; data rows start from index 1.
+  // Returns { rows, added, removed, changed, maxCols, headers }
+  // rows[i] = { type, key, rowNumA, rowNumB, data1, data2, changedCols:Set }
   function compareData(data1, data2) {
-    const maxRows = Math.max(data1.length, data2.length);
+    const headers1 = data1[0] || [];
+    const headers2 = data2[0] || [];
     const maxCols = Math.max(
-      ...data1.map(r => r.length),
-      ...data2.map(r => r.length),
+      headers1.length, headers2.length,
+      ...data1.slice(1).map(r => r.length),
+      ...data2.slice(1).map(r => r.length),
       1
     );
+    const headers = headers1.length >= headers2.length ? headers1 : headers2;
+
+    // Build key → { rowData, rowNum } maps (key = first column value)
+    const map1 = new Map();
+    for (let r = 1; r < data1.length; r++) {
+      const row = data1[r] || [];
+      const key = String(row[0] ?? '');
+      if (!map1.has(key)) map1.set(key, { rowData: row, rowNum: r + 1 });
+    }
+    const map2 = new Map();
+    for (let r = 1; r < data2.length; r++) {
+      const row = data2[r] || [];
+      const key = String(row[0] ?? '');
+      if (!map2.has(key)) map2.set(key, { rowData: row, rowNum: r + 1 });
+    }
+
+    // Merge key order: A keys first, then B-only keys
+    const allKeys = [...map1.keys()];
+    for (const key of map2.keys()) {
+      if (!map1.has(key)) allKeys.push(key);
+    }
+
     const rows = [], added = [], removed = [], changed = [];
 
-    for (let r = 0; r < maxRows; r++) {
-      const row1 = r < data1.length ? (data1[r] || []) : null;
-      const row2 = r < data2.length ? (data2[r] || []) : null;
+    for (const key of allKeys) {
+      const e1 = map1.get(key);
+      const e2 = map2.get(key);
 
-      if (row1 === null) {
-        rows.push({ type: 'added',   rowNum: r + 1, data1: null, data2: row2, changedCols: new Set() });
-        added.push({ row: r + 1, data: row2 });
-      } else if (row2 === null) {
-        rows.push({ type: 'removed', rowNum: r + 1, data1: row1, data2: null, changedCols: new Set() });
-        removed.push({ row: r + 1, data: row1 });
+      if (!e1) {
+        // Only in B (added)
+        rows.push({ type: 'added', key, rowNumA: null, rowNumB: e2.rowNum,
+                    data1: null, data2: e2.rowData, changedCols: new Set() });
+        added.push({ key, row: e2.rowNum, data: e2.rowData });
+      } else if (!e2) {
+        // Only in A (removed)
+        rows.push({ type: 'removed', key, rowNumA: e1.rowNum, rowNumB: null,
+                    data1: e1.rowData, data2: null, changedCols: new Set() });
+        removed.push({ key, row: e1.rowNum, data: e1.rowData });
       } else {
+        // In both — compare column by column
         const changedCols = new Set();
         const changes = [];
         for (let c = 0; c < maxCols; c++) {
-          const v1 = String(row1[c] ?? '');
-          const v2 = String(row2[c] ?? '');
+          const v1 = String(e1.rowData[c] ?? '');
+          const v2 = String(e2.rowData[c] ?? '');
           if (v1 !== v2) { changedCols.add(c); changes.push({ col: c + 1, old: v1, new: v2 }); }
         }
         if (changedCols.size > 0) {
-          rows.push({ type: 'changed', rowNum: r + 1, data1: row1, data2: row2, changedCols });
-          changed.push({ row: r + 1, changes });
+          rows.push({ type: 'changed', key, rowNumA: e1.rowNum, rowNumB: e2.rowNum,
+                      data1: e1.rowData, data2: e2.rowData, changedCols });
+          changed.push({ key, row: e1.rowNum, changes });
         } else {
-          rows.push({ type: 'same', rowNum: r + 1, data1: row1, data2: row2, changedCols: new Set() });
+          rows.push({ type: 'same', key, rowNumA: e1.rowNum, rowNumB: e2.rowNum,
+                      data1: e1.rowData, data2: e2.rowData, changedCols: new Set() });
         }
       }
     }
-    return { rows, added, removed, changed, maxCols };
+
+    return { rows, added, removed, changed, maxCols, headers };
   }
 
   // Escape HTML special chars
@@ -432,10 +465,9 @@
       .replace(/>/g, '&gt;');
   }
 
-  function showLocalAnalysis(result, headers1, headers2) {
-    const { added, removed, changed } = result;
+  function showLocalAnalysis(result) {
+    const { added, removed, changed, headers } = result;
     const total = added.length + removed.length + changed.length;
-    const headers = headers1.length >= headers2.length ? headers1 : headers2;
 
     const colName = idx => {
       const h = headers[idx];
@@ -449,13 +481,15 @@
     if (total === 0) {
       s += '兩個檔案內容完全相同，無任何差異。\n\n';
     } else {
-      s += `共發現 ${total} 處差異：新增 ${added.length} 行、刪除 ${removed.length} 行、修改 ${changed.length} 行。\n\n`;
+      s += `共發現 ${total} 個差異項目：B 獨有 ${added.length} 筆、A 獨有 ${removed.length} 筆、內容修改 ${changed.length} 筆。\n`;
+      s += `（比對依據：第一欄 ${colName(0)} 作為唯一識別鍵）\n\n`;
     }
 
-    // 2. 主要差異重點（含具體欄位值比對）
+    // 2. 主要差異重點（含具體欄位值）
     s += '🔑 主要差異重點\n';
     if (changed.length > 0) {
-      changed.slice(0, 8).forEach(row => {
+      changed.slice(0, 10).forEach(row => {
+        const keyLabel = esc(row.key);
         const diffs = row.changes.map(c => {
           const name = colName(c.col - 1);
           const numA = parseFloat(c.old), numB = parseFloat(c.new);
@@ -464,44 +498,44 @@
             ? `（差異 ${numB - numA > 0 ? '+' : ''}${(numB - numA).toLocaleString()}）`
             : '';
           return `${name}：A=${c.old || '(空白)'} vs B=${c.new || '(空白)'}${note}`;
-        }).join('；');
-        s += `• 第 ${row.row} 行　${diffs}\n`;
+        }).join('\n    ');
+        s += `• [${keyLabel}]\n    ${diffs}\n`;
       });
-      if (changed.length > 8) s += `• … 還有 ${changed.length - 8} 行修改未列出\n`;
+      if (changed.length > 10) s += `• … 還有 ${changed.length - 10} 筆修改未列出\n`;
     }
-    if (added.length   > 0) s += `• 檔案 B 新增了 ${added.length} 行（表格中綠色列）\n`;
-    if (removed.length > 0) s += `• 檔案 A 多出 ${removed.length} 行（表格中紅色列）\n`;
-    if (total === 0) s += '• 所有欄位與資料均一致\n';
+    if (added.length   > 0) s += `• 檔案 B 獨有 ${added.length} 筆（表格綠色列）\n`;
+    if (removed.length > 0) s += `• 檔案 A 獨有 ${removed.length} 筆（表格紅色列）\n`;
+    if (total === 0) s += '• 所有識別鍵與欄位均一致\n';
     s += '\n';
 
-    // 3. A 多出的項目
+    // 3. A 獨有的項目
     if (removed.length > 0) {
-      s += '⚠️ 檔案 A 多出的項目（B 中已刪除）\n';
-      removed.slice(0, 5).forEach(row => {
+      s += '⚠️ 檔案 A 獨有（B 中不存在）\n';
+      removed.slice(0, 6).forEach(row => {
         const preview = (row.data || []).slice(0, 5).filter(v => String(v) !== '').join(' | ');
-        s += `• 第 ${row.row} 行：${preview || '(空白行)'}\n`;
+        s += `• [${esc(row.key)}]　${preview}\n`;
       });
-      if (removed.length > 5) s += `• … 還有 ${removed.length - 5} 行\n`;
+      if (removed.length > 6) s += `• … 還有 ${removed.length - 6} 筆\n`;
       s += '\n';
     }
 
-    // 4. B 多出的項目
+    // 4. B 獨有的項目
     if (added.length > 0) {
-      s += '✅ 檔案 B 多出的項目（A 中沒有）\n';
-      added.slice(0, 5).forEach(row => {
+      s += '✅ 檔案 B 獨有（A 中不存在）\n';
+      added.slice(0, 6).forEach(row => {
         const preview = (row.data || []).slice(0, 5).filter(v => String(v) !== '').join(' | ');
-        s += `• 第 ${row.row} 行：${preview || '(空白行)'}\n`;
+        s += `• [${esc(row.key)}]　${preview}\n`;
       });
-      if (added.length > 5) s += `• … 還有 ${added.length - 5} 行\n`;
+      if (added.length > 6) s += `• … 還有 ${added.length - 6} 筆\n`;
       s += '\n';
     }
 
     // 5. 建議
     s += '💡 建議\n';
     if (total > 0) {
-      if (removed.length > 0) s += '• 請確認 A 中被刪除的資料是否為刻意移除，避免資料遺失。\n';
-      if (added.length   > 0) s += '• 請確認 B 中新增的資料來源是否正確。\n';
-      if (changed.length > 0) s += '• 請核對修改欄位的異動原因是否符合預期。\n';
+      if (removed.length > 0) s += '• 請確認 A 獨有的資料是否為刻意刪除，避免遺失。\n';
+      if (added.length   > 0) s += '• 請確認 B 新增的資料來源是否正確。\n';
+      if (changed.length > 0) s += '• 請逐一核對黃色高亮儲格，確認修改符合預期。\n';
     } else {
       s += '• 兩份檔案完全一致，可以放心使用。\n';
     }
@@ -518,13 +552,11 @@
 
     try {
       const [data1, data2] = await Promise.all([parseExcel(files[1]), parseExcel(files[2])]);
-      const headers1 = data1[0] || [];
-      const headers2 = data2[0] || [];
       const result = compareData(data1, data2);
 
       document.getElementById('loadingEl').classList.add('hidden');
-      renderResults(result, headers1, headers2);
-      showLocalAnalysis(result, headers1, headers2);
+      renderResults(result);
+      showLocalAnalysis(result);
     } catch(err) {
       document.getElementById('loadingEl').classList.add('hidden');
       alert('讀取檔案失敗，請確認是有效的 Excel 檔案');
@@ -534,16 +566,16 @@
     btn.textContent = '🔍 開始比對';
   }
 
-  function renderResults(result, headers1, headers2) {
-    const { rows, added, removed, changed, maxCols } = result;
+  function renderResults(result) {
+    const { rows, added, removed, changed, maxCols, headers } = result;
     const total = added.length + removed.length + changed.length;
     const LIMIT = 300;
     const displayRows = rows.slice(0, LIMIT);
     const truncated = rows.length > LIMIT;
 
-    // Column header labels
-    const hA = Array.from({ length: maxCols }, (_, i) => esc(headers1[i] ?? `欄 ${i + 1}`));
-    const hB = Array.from({ length: maxCols }, (_, i) => esc(headers2[i] ?? `欄 ${i + 1}`));
+    // Column header labels (same for both sides — same schema)
+    const hA = Array.from({ length: maxCols }, (_, i) => esc(headers[i] ?? `欄 ${i + 1}`));
+    const hB = Array.from({ length: maxCols }, (_, i) => esc(headers[i] ?? `欄 ${i + 1}`));
 
     // ── thead row 1: File A / File B labels ─────────────────
     const thRow1 =
@@ -563,7 +595,8 @@
       const typeClass = row.type === 'added' ? 'row-added'
                       : row.type === 'removed' ? 'row-removed'
                       : '';
-      let tds = `<td class="td-rownum">${row.rowNum}</td>`;
+      const rowLabel = row.rowNumA ?? row.rowNumB;
+      let tds = `<td class="td-rownum">${rowLabel}</td>`;
 
       // A side
       for (let c = 0; c < maxCols; c++) {
