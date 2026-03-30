@@ -292,7 +292,7 @@
     return { added, removed, changed };
   }
 
-  function callAI(diff, headers1, headers2) {
+  function showLocalAnalysis(diff) {
     const total = diff.added.length + diff.removed.length + diff.changed.length;
     let summary = '';
 
@@ -321,7 +321,7 @@
     if (total > 0) summary += '• 請仔細核對差異項目，確認修改是否符合預期。\n';
     else summary += '• 兩份檔案一致，可以放心使用。\n';
 
-    return Promise.resolve(summary);
+    document.getElementById('aiContent').innerHTML = `<div class="ai-summary">${summary}</div>`;
   }
 
   async function startCompare() {
@@ -334,16 +334,10 @@
     try {
       const [data1, data2] = await Promise.all([parseExcel(files[1]), parseExcel(files[2])]);
       const diff = compareData(data1, data2);
-      const headers1 = data1[0] || [];
-      const headers2 = data2[0] || [];
 
       document.getElementById('loadingEl').classList.add('hidden');
       renderResults(diff);
-
-      // 本地智慧分析
-      const aiEl = document.getElementById('aiContent');
-      const summary = await callAI(diff, headers1, headers2);
-      aiEl.innerHTML = `<div class="ai-summary">${summary}</div>`;
+      showLocalAnalysis(diff);
     } catch(err) {
       document.getElementById('loadingEl').classList.add('hidden');
       alert('讀取檔案失敗，請確認是有效的 Excel 檔案');
