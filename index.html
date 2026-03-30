@@ -167,7 +167,8 @@
       overflow: auto;
       border-radius: 8px;
       max-height: 620px;
-      border: 1px solid rgba(255,255,255,0.07);
+      min-height: 60px;
+      border: 1px solid rgba(255,255,255,0.12);
     }
     .compare-table {
       border-collapse: collapse;
@@ -394,7 +395,7 @@
     );
     const rows = [], added = [], removed = [], changed = [];
 
-    for (let r = 1; r < maxRows; r++) {
+    for (let r = 0; r < maxRows; r++) {
       const row1 = r < data1.length ? (data1[r] || []) : null;
       const row2 = r < data2.length ? (data2[r] || []) : null;
 
@@ -581,7 +582,9 @@
       return `<tr class="${typeClass}">${tds}</tr>`;
     }).join('');
 
-    if (truncated) {
+    if (rows.length === 0) {
+      tbody = `<tr><td colspan="${maxCols * 2 + 2}" class="truncate-notice">（兩個檔案均無資料列）</td></tr>`;
+    } else if (truncated) {
       tbody += `<tr><td colspan="${maxCols * 2 + 2}" class="truncate-notice">
         ⚠️ 僅顯示前 ${LIMIT} 行，共 ${rows.length} 行資料
       </td></tr>`;
