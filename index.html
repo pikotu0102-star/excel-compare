@@ -384,8 +384,8 @@
         ${chips(s2.filter(s => common.includes(s)), 'chip-common')}
         ${chips(bOnly, 'chip-b-only')}
       </div>
-      ${aOnly.length > 0 ? `<div class="sheet-note sheet-note-red">⚠️ 僅 A 有：${aOnly.map(esc).join('、')}</div>` : ''}
-      ${bOnly.length > 0 ? `<div class="sheet-note sheet-note-green">✅ 僅 B 有：${bOnly.map(esc).join('、')}</div>` : ''}
+      ${aOnly.length > 0 ? `<div class="sheet-note sheet-note-red">⚠️ 僅 ${esc(document.getElementById('customName1')?.value?.trim()||'檔案A')} 有：${aOnly.map(esc).join('、')}</div>` : ''}
+      ${bOnly.length > 0 ? `<div class="sheet-note sheet-note-green">✅ 僅 ${esc(document.getElementById('customName2')?.value?.trim()||'檔案B')} 有：${bOnly.map(esc).join('、')}</div>` : ''}
       ${common.length === 0 ? '<div class="sheet-note sheet-note-red">❌ 兩個檔案沒有共同工作表，無法比對</div>' : `<div class="sheet-note" style="color:#a78bfa;background:rgba(139,92,246,.1)">✔ 共同工作表：${common.length} 個</div>`}
     `;
     document.getElementById('sheetSummaryEl').classList.remove('hidden');
@@ -667,8 +667,8 @@
       <div class="stats-row">
         <div class="stat-card"><div class="stat-number">${rows.length}</div><div class="stat-label">總 Item 數</div></div>
         <div class="stat-card"><div class="stat-number" style="color:#fbbf24">${changed.length}</div><div class="stat-label">數值變動</div></div>
-        <div class="stat-card"><div class="stat-number" style="color:#f87171">${removed.length}</div><div class="stat-label">A 獨有</div></div>
-        <div class="stat-card"><div class="stat-number" style="color:#34d399">${added.length}</div><div class="stat-label">B 獨有</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:#f87171">${removed.length}</div><div class="stat-label">${esc(nameA)} 獨有</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:#34d399">${added.length}</div><div class="stat-label">${esc(nameB)} 獨有</div></div>
         <div class="stat-card"><div class="stat-number" style="color:#60a5fa">${total}</div><div class="stat-label">總差異數</div></div>
       </div>
 
@@ -680,13 +680,13 @@
       <div class="section" style="padding:16px 20px;">
         <div class="section-title">
           📋 工作表「${esc(sheetName)}」比對結果
-          <span class="badge badge-removed">紅＝A獨有</span>
-          <span class="badge badge-added">綠＝B獨有</span>
+          <span class="badge badge-removed">紅＝${esc(nameA)}獨有</span>
+          <span class="badge badge-added">綠＝${esc(nameB)}獨有</span>
           <span class="badge badge-changed">黃＝數值差異</span>
         </div>
         <div class="legend">
-          <div class="legend-item"><div class="legend-dot" style="background:rgba(248,113,113,.35)"></div>A 獨有 Item（整行紅色）</div>
-          <div class="legend-item"><div class="legend-dot" style="background:rgba(52,211,153,.35)"></div>B 獨有 Item（整行綠色）</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(248,113,113,.35)"></div>${esc(nameA)} 獨有 Item（整行紅色）</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(52,211,153,.35)"></div>${esc(nameB)} 獨有 Item（整行綠色）</div>
           <div class="legend-item"><div class="legend-dot" style="background:rgba(251,191,36,.4)"></div>數值有差異（儲格黃色）</div>
           <div class="legend-item" style="color:#34d399">▲ 數值增加</div>
           <div class="legend-item" style="color:#f87171">▼ 數值減少</div>
@@ -723,12 +723,14 @@
   function showAnalysis(result, sheetName) {
     const { added, removed, changed } = result;
     const total = added.length + removed.length + changed.length;
+    const nameA = document.getElementById('customName1')?.value?.trim() || '檔案A';
+    const nameB = document.getElementById('customName2')?.value?.trim() || '檔案B';
 
     let s = `📊 工作表「${sheetName}」差異摘要\n`;
     if (total === 0) {
       s += '兩個檔案此工作表的所有 Item 完全相同，無差異。\n\n';
     } else {
-      s += `共 ${total} 個 Item 有差異：數值變動 ${changed.length} 個、A 獨有 ${removed.length} 個、B 獨有 ${added.length} 個。\n\n`;
+      s += `共 ${total} 個 Item 有差異：數值變動 ${changed.length} 個、${nameA} 獨有 ${removed.length} 個、${nameB} 獨有 ${added.length} 個。\n\n`;
     }
 
     if (changed.length > 0) {
@@ -743,7 +745,7 @@
     }
 
     if (removed.length > 0) {
-      s += `⚠️ 僅 A 有的 Item（共 ${removed.length} 個）\n`;
+      s += `⚠️ 僅 ${nameA} 有的 Item（共 ${removed.length} 個）\n`;
       removed.slice(0, 8).forEach(item => {
         const vals = item.colData.filter(c => c.vA.raw).map(c => `${c.label}: ${fmtNum(c.vA.raw)}`).join('，');
         s += `• ${item.key}${vals ? `（${vals}）` : ''}\n`;
@@ -753,7 +755,7 @@
     }
 
     if (added.length > 0) {
-      s += `✅ 僅 B 有的 Item（共 ${added.length} 個）\n`;
+      s += `✅ 僅 ${nameB} 有的 Item（共 ${added.length} 個）\n`;
       added.slice(0, 8).forEach(item => {
         const vals = item.colData.filter(c => c.vB.raw).map(c => `${c.label}: ${fmtNum(c.vB.raw)}`).join('，');
         s += `• ${item.key}${vals ? `（${vals}）` : ''}\n`;
@@ -765,8 +767,8 @@
     s += '💡 建議\n';
     if (total > 0) {
       if (changed.length > 0) s += '• 請核對黃色高亮欄位，確認差異原因。\n';
-      if (removed.length > 0) s += '• A 獨有的 Item 請確認是否遺漏。\n';
-      if (added.length   > 0) s += '• B 新增的 Item 請確認報價來源正確。\n';
+      if (removed.length > 0) s += `• ${nameA} 獨有的 Item 請確認是否遺漏。\n`;
+      if (added.length   > 0) s += `• ${nameB} 新增的 Item 請確認報價來源正確。\n`;
     } else {
       s += '• 此工作表資料完全一致，無需修正。\n';
     }
