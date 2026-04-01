@@ -632,7 +632,7 @@
       `<th class="th-item" rowspan="2">Item</th>` +
       cols.map(col => `<th colspan="4" class="th-valcol">${esc(col.label)}</th>`).join('');
     const th2 = cols.map(() =>
-      `<th class="th-val-a">${esc(nameA)}</th><th class="th-val-b">${esc(nameB)}</th><th class="th-diff">差異額</th><th class="th-pct">差異%</th>`
+      `<th class="th-val-a">${esc(nameA)}</th><th class="th-val-b">${esc(nameB)}</th><th class="th-diff">差異額(A-B)</th><th class="th-pct">差異%</th>`
     ).join('');
 
     // Rows
@@ -742,7 +742,7 @@
       changed.slice(0, 15).forEach(item => {
         item.colData.filter(c => c.hasDiff).forEach(col => {
           const pctStr = col.pct !== null ? `${col.pct > 0 ? '+' : ''}${col.pct.toFixed(1)}%` : 'N/A';
-          s += `• ${item.key} [${col.label}]：${fmtNum(col.vA.raw)} → ${fmtNum(col.vB.raw)}（差 ${fmtDiff(col.diff)}，${pctStr}）\n`;
+          s += `• ${item.key} [${col.label}]：${nameA}=${fmtNum(col.vA.raw)} → ${nameB}=${fmtNum(col.vB.raw)}（差 ${fmtDiff(col.diff)}，${pctStr}）\n`;
         });
       });
       s += '\n';
