@@ -210,10 +210,38 @@
     /* Cell-level diff */
     .cell-diff { background: rgba(251,191,36,.22) !important; }
 
-    /* Diff direction colors */
-    .diff-up   { color: #f87171 !important; }
-    .diff-down { color: #34d399 !important; }
+    /* Diff direction colors (positive=green, negative=red) */
+    .diff-up   { color: #34d399 !important; }
+    .diff-down { color: #f87171 !important; }
     .diff-zero { color: #475569 !important; }
+
+    /* ── Alternating rows ─────────────────────────── */
+    .row-even .td-item   { background: #1c2235 !important; }
+    .row-even .td-a      { background: rgba(12,32,62,.28) !important; }
+    .row-even .td-b      { background: rgba(8,38,28,.28) !important; }
+    .row-even .td-diff   { background: rgba(40,30,10,.18) !important; }
+    .row-even .td-pct    { background: rgba(40,30,10,.18) !important; }
+    .row-even .td-text-a { background: rgba(12,32,62,.28) !important; }
+    .row-even .td-text-b { background: rgba(8,38,28,.28) !important; }
+
+    /* ── Total rows ───────────────────────────────── */
+    .row-total .td-item { font-weight: 700 !important; color: #f8fafc !important; font-size: .85rem; }
+    .row-total td       { border-top: 2px solid rgba(255,255,255,.18) !important; }
+
+    /* ── Block separator row ──────────────────────── */
+    .row-sep td { height: 4px; padding: 0 !important; border: none !important; background: rgba(255,255,255,.05) !important; }
+
+    /* ── Filter toggle button ─────────────────────── */
+    .filter-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+    .toggle-diff-btn {
+      padding: 5px 16px; border-radius: 20px; font-size: .8rem; font-weight: 600;
+      border: 1px solid rgba(251,191,36,.4); color: #fbbf24;
+      background: rgba(251,191,36,.08); cursor: pointer;
+      transition: all .2s; font-family: 'Noto Sans TC', sans-serif;
+    }
+    .toggle-diff-btn.active { background: rgba(251,191,36,.28); border-color: #fbbf24; box-shadow: 0 0 8px rgba(251,191,36,.2); }
+    .toggle-diff-btn:hover  { background: rgba(251,191,36,.16); }
+    .filter-count { font-size: .77rem; color: #64748b; }
 
     /* Truncation notice */
     .truncate-notice {
@@ -369,7 +397,7 @@
 
   function fmtPct(pct) {
     if (pct === null) return '';
-    return (pct > 0 ? '+' : '') + pct.toFixed(1) + '%';
+    return (pct > 0 ? '+' : '') + parseFloat(pct.toFixed(2)) + '%';
   }
 
   // ── Core: get sheet rows ──────────────────────────────────────
@@ -535,15 +563,24 @@
       `<th colspan="4" class="th-valcol">${esc(nreLabel)}</th>` +
       `<th colspan="4" class="th-valcol">${esc(hpLabel)}</th>`;
     const th2 =
-      `<th class="th-val-a">A（舊）</th><th class="th-val-b">B（新）</th><th class="th-diff">差異額</th><th class="th-pct">差異%</th>` +
-      `<th class="th-val-a">A（舊）</th><th class="th-val-b">B（新）</th><th class="th-diff">差異額</th><th class="th-pct">差異%</th>`;
+      `<th class="th-val-a">A 舊值</th><th class="th-val-b">B 新值</th><th class="th-diff">差異</th><th class="th-pct">差異%</th>` +
+      `<th class="th-val-a">A 舊值</th><th class="th-val-b">B 新值</th><th class="th-diff">差異</th><th class="th-pct">差異%</th>`;
 
     // ── tbody ──────────────────────────────────────────
     const displayRows = rows.slice(0, LIMIT);
+    let evenIdx = 0;
     let tbody = displayRows.map(row => {
+      const isTotalRow = /^total\b/i.test(row.key.trim()) || /^grand\s+total/i.test(row.key.trim());
       const typeCls = row.type === 'added' ? 'row-added' : row.type === 'removed' ? 'row-removed' : '';
+      const totalCls = isTotalRow ? ' row-total' : '';
       const isChanged = row.type === 'changed';
       const itemCls = `td-item${isChanged ? ' cell-diff' : ''}`;
+
+      // Separator row before Total items
+      const sepRow = isTotalRow ? `<tr class="row-sep"><td colspan="9"></td></tr>` : '';
+
+      // Alternating stripe (skip sep rows from count)
+      const evenCls = (evenIdx++ % 2 === 1) ? ' row-even' : '';
 
       // NRE columns
       const nreDirCls = row.nreDiff === null ? '' : row.nreDiff > 0 ? ' diff-up' : row.nreDiff < 0 ? ' diff-down' : ' diff-zero';
@@ -552,7 +589,7 @@
       const hpDirCls = row.hpDiff === null ? '' : row.hpDiff > 0 ? ' diff-up' : row.hpDiff < 0 ? ' diff-down' : ' diff-zero';
       const hpCellCls = isChanged && row.hpDiff !== null && row.hpDiff !== 0 ? ' cell-diff' : '';
 
-      return `<tr class="${typeCls}">
+      return `${sepRow}<tr class="${typeCls}${totalCls}${evenCls}" data-type="${row.type}">
         <td class="${itemCls}">${esc(row.key)}</td>
         <td class="td-a${nreCellCls}">${esc(fmtNum(row.rawNreA))}</td>
         <td class="td-b${nreCellCls}">${esc(fmtNum(row.rawNreB))}</td>
@@ -599,6 +636,10 @@
           <div class="legend-item"><div class="legend-dot" style="background:rgba(251,191,36,.4)"></div>數值有差異（儲格黃色）</div>
           <div class="legend-item" style="color:#f87171">▲ 金額增加</div>
           <div class="legend-item" style="color:#34d399">▼ 金額減少</div>
+        </div>
+        <div class="filter-bar">
+          <button class="toggle-diff-btn" id="toggleDiffBtn" onclick="toggleDiffOnly()">🔍 僅顯示差異</button>
+          <span class="filter-count" id="filterCount"></span>
         </div>
         <div class="compare-wrap">
           <table class="compare-table" id="compareTable">
@@ -680,6 +721,23 @@
     }
 
     document.getElementById('aiContent').innerHTML = `<div class="ai-summary">${s}</div>`;
+  }
+
+  // ── toggleDiffOnly ────────────────────────────────────────────
+  function toggleDiffOnly() {
+    const btn = document.getElementById('toggleDiffBtn');
+    const isActive = btn.classList.toggle('active');
+    btn.textContent = isActive ? '✅ 僅顯示差異' : '🔍 僅顯示差異';
+    const rows = document.querySelectorAll('#compareTable tbody tr[data-type]');
+    let shownCount = 0;
+    rows.forEach(tr => {
+      const isSame = tr.dataset.type === 'same';
+      const hide = isActive && isSame;
+      tr.style.display = hide ? 'none' : '';
+      if (!hide) shownCount++;
+    });
+    const countEl = document.getElementById('filterCount');
+    if (countEl) countEl.textContent = isActive ? `顯示 ${shownCount} 筆有差異` : '';
   }
 </script>
 </body>
