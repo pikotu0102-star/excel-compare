@@ -234,6 +234,14 @@
     /* ── Block separator row ──────────────────────── */
     .row-sep td { height: 4px; padding: 0 !important; border: none !important; background: rgba(255,255,255,.05) !important; }
 
+    /* ── ODM IUR product section header ──────────── */
+    .odm-product-hdr td {
+      padding: 8px 14px !important; font-weight: 700; color: #a78bfa;
+      background: rgba(139,92,246,.12) !important;
+      border-top: 2px solid rgba(139,92,246,.3) !important;
+      border-bottom: 1px solid rgba(139,92,246,.2) !important;
+    }
+
     /* ── Filter toggle button ─────────────────────── */
     .filter-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
     .toggle-diff-btn {
@@ -593,6 +601,259 @@
     return { rows, added, removed, changed, cols };
   }
 
+  // ══════════════════════════════════════════════════════════════
+  //  ODM IUR SPECIAL MODE
+  // ══════════════════════════════════════════════════════════════
+
+  function isOdmIurSheet(name) {
+    return /odm.?iur/i.test(name);
+  }
+
+  // ── Parse HQ ODM IUR ─────────────────────────────────────────
+  // Blocks start with a title row containing "ODM IUR" / "Wave".
+  // Each block has a "Platform Name | Qty | U/P | Total Amt" header row,
+  // followed by data rows.
+  function parseHqOdmIur(data) {
+    const items = [];
+    let product = '';
+    let colP = -1, colQty = -1, colUp = -1, colTotal = -1;
+    let inData = false;
+
+    for (let r = 0; r < data.length; r++) {
+      const row = data[r] || [];
+      const cells = row.map(v => String(v ?? '').trim());
+      if (cells.every(c => c === '')) continue;
+
+      // Title row: contains "ODM IUR" or "Wave"
+      if (cells.some(c => /odm.?iur|wave\s*\d/i.test(c))) {
+        // Product name = first cell that isn't the "ODM IUR/Wave" part
+        product = cells.find(c => c && !/odm.?iur|wave\s*\d/i.test(c)) || cells.find(c => c) || '';
+        inData = false; colP = colQty = colUp = colTotal = -1;
+        continue;
+      }
+
+      // Header row: contains "Platform Name"
+      if (cells.some(c => /^platform.?name$/i.test(c))) {
+        colP     = cells.findIndex(c => /^platform.?name$/i.test(c));
+        colQty   = cells.findIndex(c => /^qty$/i.test(c));
+        colUp    = cells.findIndex(c => /^u\/p$/i.test(c));
+        colTotal = cells.findIndex(c => /total.?amt/i.test(c));
+        inData = true;
+        continue;
+      }
+
+      // Data row
+      if (inData && colP >= 0) {
+        const platform = cells[colP];
+        if (!platform || /^(platform|qty|u\/p|total)/i.test(platform)) continue;
+        items.push({
+          product, platform,
+          qty:      parseNum(cells[colQty]),
+          up:       parseNum(cells[colUp]),
+          totalAmt: parseNum(cells[colTotal]),
+        });
+      }
+    }
+    return items;
+  }
+
+  // ── Parse Wistron ODM IUR ────────────────────────────────────
+  // Blocks start with a product-name title row (no "ODM IUR" prefix).
+  // Each block has a header row containing "Platform Name".
+  // Qty may be split into WHQ / WCQ sub-columns (sum both).
+  function parseWistronOdmIur(data) {
+    const items = [];
+    let product = '';
+    let colP = -1, colQtyA = -1, colQtyB = -1, colUp = -1, colTotal = -1;
+    let headerRowIdx = -1;
+    let inData = false;
+
+    for (let r = 0; r < data.length; r++) {
+      const row = data[r] || [];
+      const cells = row.map(v => String(v ?? '').trim());
+      if (cells.every(c => c === '')) continue;
+
+      // Header row: contains "Platform Name"
+      if (cells.some(c => /^platform.?name$/i.test(c))) {
+        colP     = cells.findIndex(c => /^platform.?name$/i.test(c));
+        colUp    = cells.findIndex(c => /^u\/p$/i.test(c));
+        colTotal = cells.findIndex(c => /total.?amt/i.test(c));
+        // Qty columns: find all indices with "qty" in label
+        const qtyIdxs = cells.reduce((a, c, i) => { if (/qty/i.test(c)) a.push(i); return a; }, []);
+        colQtyA = qtyIdxs[0] ?? -1;
+        colQtyB = qtyIdxs[1] ?? -1;
+        headerRowIdx = r;
+        inData = false;
+        continue;
+      }
+
+      // Sub-header row (WHQ / WCQ) immediately after header row
+      if (r === headerRowIdx + 1 && cells.some(c => /^(whq|wcq)$/i.test(c))) {
+        const wi = cells.findIndex(c => /^whq$/i.test(c));
+        const ci = cells.findIndex(c => /^wcq$/i.test(c));
+        if (wi >= 0) colQtyA = wi;
+        if (ci >= 0) colQtyB = ci;
+        inData = true;
+        continue;
+      }
+
+      // Start data if past the header row and no sub-header found
+      if (headerRowIdx >= 0 && !inData && r > headerRowIdx) inData = true;
+
+      // Possible product title row: text-only row before / between blocks
+      // Detect if platform col is absent or empty AND no numeric values
+      const platformEmpty = colP < 0 || !cells[colP];
+      const hasNums = cells.some(c => c !== '' && parseNum(c) !== null);
+      if (platformEmpty && !hasNums) {
+        const txt = cells.find(c => c !== '');
+        if (txt && !/^(platform|qty|u\/p|total|sub.?amt|whq|wcq)/i.test(txt)) {
+          product = txt;
+          inData = false; headerRowIdx = -1;
+          colP = colQtyA = colQtyB = colUp = colTotal = -1;
+          continue;
+        }
+      }
+
+      // Data row
+      if (inData && colP >= 0) {
+        const platform = cells[colP];
+        if (!platform || /^(platform|qty|u\/p|total|whq|wcq)/i.test(platform)) continue;
+        const qA = parseNum(cells[colQtyA]) ?? 0;
+        const qB = colQtyB >= 0 ? (parseNum(cells[colQtyB]) ?? 0) : 0;
+        items.push({
+          product, platform,
+          qty:      qA + qB,
+          up:       parseNum(cells[colUp]),
+          totalAmt: parseNum(cells[colTotal]),
+        });
+      }
+    }
+    return items;
+  }
+
+  // ── Compare ODM IUR ──────────────────────────────────────────
+  function compareOdmIur(data1, data2) {
+    const hqItems  = parseHqOdmIur(data1);
+    const wisItems = parseWistronOdmIur(data2);
+
+    const mapA = new Map(), mapB = new Map();
+    hqItems .forEach(i => { const k = `${i.product}|${i.platform}`; if (!mapA.has(k)) mapA.set(k, i); });
+    wisItems.forEach(i => { const k = `${i.product}|${i.platform}`; if (!mapB.has(k)) mapB.set(k, i); });
+
+    const allKeys = [...mapA.keys()];
+    for (const k of mapB.keys()) if (!mapA.has(k)) allKeys.push(k);
+
+    const rows = []; let added = 0, removed = 0, changed = 0;
+
+    for (const key of allKeys) {
+      const a = mapA.get(key), b = mapB.get(key);
+      const [product, platform] = key.split('|');
+
+      const { diff: qtyDiff }            = calcDiff(a?.qty      ?? null, b?.qty      ?? null);
+      const { diff: upDiff  }            = calcDiff(a?.up       ?? null, b?.up       ?? null);
+      const { diff: totDiff, pct: totPct } = calcDiff(a?.totalAmt ?? null, b?.totalAmt ?? null);
+
+      const anyDiff = [qtyDiff, upDiff, totDiff].some(d => d !== null && Math.abs(d) > 1e-9);
+      let type;
+      if (!a) { type = 'added';   added++;   }
+      else if (!b) { type = 'removed'; removed++; }
+      else if (anyDiff) { type = 'changed'; changed++; }
+      else type = 'same';
+
+      rows.push({ key, product, platform, type,
+                  qtyA: a?.qty ?? null,      qtyB: b?.qty ?? null,      qtyDiff,
+                  upA:  a?.up  ?? null,      upB:  b?.up  ?? null,      upDiff,
+                  totA: a?.totalAmt ?? null, totB: b?.totalAmt ?? null, totDiff, totPct });
+    }
+    return { rows, added, removed, changed };
+  }
+
+  // ── Render ODM IUR ───────────────────────────────────────────
+  function renderOdmIur(result, sheetName, nameA, nameB) {
+    const { rows, added, removed, changed } = result;
+    const TOTAL_COLS = 10;
+
+    // Group by product (preserving order)
+    const products = [], pMap = new Map();
+    rows.forEach(row => {
+      if (!pMap.has(row.product)) { pMap.set(row.product, []); products.push(row.product); }
+      pMap.get(row.product).push(row);
+    });
+
+    const th = `
+      <th class="th-item" style="min-width:150px">產品</th>
+      <th class="th-val-a" style="text-align:left;min-width:140px">Platform</th>
+      <th class="th-val-a">${esc(nameA)} Qty</th>
+      <th class="th-val-b">${esc(nameB)} Qty</th>
+      <th class="th-val-a">${esc(nameA)} U/P</th>
+      <th class="th-val-b">${esc(nameB)} U/P</th>
+      <th class="th-val-a">${esc(nameA)} Total</th>
+      <th class="th-val-b">${esc(nameB)} Total</th>
+      <th class="th-diff">差異額(A-B)</th>
+      <th class="th-pct">差異%</th>`;
+
+    let tbody = '', evenIdx = 0;
+    const hi = (isDiff) => isDiff ? ' cell-diff' : '';
+    const dir = d => d === null ? '' : d > 0 ? ' diff-up' : d < 0 ? ' diff-down' : ' diff-zero';
+
+    products.forEach(product => {
+      tbody += `<tr class="odm-product-hdr"><td colspan="${TOTAL_COLS}">📦 ${esc(product)}</td></tr>`;
+      pMap.get(product).forEach(row => {
+        const typeCls = row.type === 'added' ? 'row-added' : row.type === 'removed' ? 'row-removed' : '';
+        const evenCls = (evenIdx++ % 2 === 1) ? ' row-even' : '';
+        const chg = row.type === 'changed';
+        const qH = chg && row.qtyDiff !== null && Math.abs(row.qtyDiff) > 1e-9;
+        const uH = chg && row.upDiff  !== null && Math.abs(row.upDiff)  > 1e-9;
+        const tH = chg && row.totDiff !== null && Math.abs(row.totDiff) > 1e-9;
+        tbody += `<tr class="${typeCls}${evenCls}" data-type="${row.type}">
+          <td class="td-item" title="${esc(row.product)}">${esc(row.product)}</td>
+          <td class="td-a" style="text-align:left">${esc(row.platform)}</td>
+          <td class="td-a${hi(qH)}">${esc(fmtNum(row.qtyA ?? ''))}</td>
+          <td class="td-b${hi(qH)}">${esc(fmtNum(row.qtyB ?? ''))}</td>
+          <td class="td-a${hi(uH)}">${esc(fmtNum(row.upA  ?? ''))}</td>
+          <td class="td-b${hi(uH)}">${esc(fmtNum(row.upB  ?? ''))}</td>
+          <td class="td-a${hi(tH)}">${esc(fmtNum(row.totA ?? ''))}</td>
+          <td class="td-b${hi(tH)}">${esc(fmtNum(row.totB ?? ''))}</td>
+          <td class="td-diff${dir(row.totDiff)}${hi(tH)}">${esc(fmtDiff(row.totDiff))}</td>
+          <td class="td-pct${dir(row.totDiff)}${hi(tH)}">${esc(fmtPct(row.totPct))}</td>
+        </tr>`;
+      });
+    });
+
+    if (rows.length === 0)
+      tbody = `<tr><td colspan="${TOTAL_COLS}" class="truncate-notice">（無可比對的 ODM IUR 資料）</td></tr>`;
+
+    const html = `
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-number">${rows.length}</div><div class="stat-label">總比對筆數</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:#fbbf24">${changed}</div><div class="stat-label">數值變動</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:#f87171">${removed}</div><div class="stat-label">${esc(nameA)} 獨有</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:#34d399">${added}</div><div class="stat-label">${esc(nameB)} 獨有</div></div>
+      </div>
+      <div class="section" style="padding:16px 20px;">
+        <div class="section-title">
+          📋 工作表「${esc(sheetName)}」ODM IUR 比對結果
+          <span class="badge badge-changed">黃＝數值差異</span>
+          <span class="badge badge-removed">紅＝${esc(nameA)}獨有</span>
+          <span class="badge badge-added">綠＝${esc(nameB)}獨有</span>
+        </div>
+        <div class="filter-bar">
+          <button class="toggle-diff-btn" id="toggleDiffBtn" onclick="toggleDiffOnly()">🔍 僅顯示差異</button>
+          <span class="filter-count" id="filterCount"></span>
+        </div>
+        <div class="compare-wrap">
+          <table class="compare-table" id="compareTable">
+            <thead><tr>${th}</tr></thead>
+            <tbody>${tbody}</tbody>
+          </table>
+        </div>
+      </div>`;
+
+    const el = document.getElementById('results');
+    el.innerHTML = html;
+    el.classList.remove('hidden');
+  }
+
   // ── startCompare ──────────────────────────────────────────────
   function startCompare() {
     const sheetName = document.getElementById('sheetSelect').value;
@@ -606,10 +867,17 @@
       try {
         const data1 = getSheetData(workbooks[1], sheetName);
         const data2 = getSheetData(workbooks[2], sheetName);
-        const result = compareData(data1, data2);
+        const nameA = document.getElementById('customName1')?.value?.trim() || '檔案A';
+        const nameB = document.getElementById('customName2')?.value?.trim() || '檔案B';
         document.getElementById('loadingEl').classList.add('hidden');
-        renderResults(result, sheetName);
-        showAnalysis(result, sheetName);
+        if (isOdmIurSheet(sheetName)) {
+          const result = compareOdmIur(data1, data2);
+          renderOdmIur(result, sheetName, nameA, nameB);
+        } else {
+          const result = compareData(data1, data2);
+          renderResults(result, sheetName);
+          showAnalysis(result, sheetName);
+        }
       } catch(err) {
         document.getElementById('loadingEl').classList.add('hidden');
         alert('比對失敗：' + err.message);
