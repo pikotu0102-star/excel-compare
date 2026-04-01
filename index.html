@@ -210,8 +210,8 @@
     .row-removed .td-text-a { background: rgba(248,113,113,.18) !important; color: #f87171; }
     .row-removed .td-text-b { background: rgba(248,113,113,.04) !important; color: #334155; }
 
-    /* Cell-level diff */
-    .cell-diff { background: rgba(251,191,36,.22) !important; }
+    /* Cell-level diff — high specificity to beat .row-even overrides */
+    .compare-table tbody tr td.cell-diff { background: rgba(251,191,36,.28) !important; }
 
     /* Diff direction colors (positive=green, negative=red) */
     .diff-up   { color: #34d399 !important; }
@@ -506,8 +506,8 @@
     if (col0 !== '' && /^\d+$/.test(col0)) return true;
     // Skip item col that is a plain number
     if (/^\d+$/.test(item)) return true;
-    // Skip project/model title rows (start with a 4-digit year, or contain product names)
-    if (/^\d{4}\s|omnibook/i.test(item)) return true;
+    // Skip project/model title rows (start with a 4-digit year, or contain product name keywords)
+    if (/^\d{4}|omnibook|flip_asia/i.test(item)) return true;
     if (item.startsWith('*')) return true;
     if (/will be paid/i.test(item)) return true;
     if (/^note$/i.test(item)) return true;
@@ -574,7 +574,7 @@
         const vA = getVal(e1, col.idx1);
         const vB = getVal(e2, col.idx2);
         const { diff, pct } = calcDiff(vA.num, vB.num);
-        const hasDiff  = diff !== null && diff !== 0;
+        const hasDiff  = diff !== null && Math.abs(Number(diff)) > 1e-9;
         const textDiff = vA.raw !== vB.raw && diff === null && (vA.raw !== '' || vB.raw !== '');
         return { label: col.label, vA, vB, diff, pct, hasDiff, textDiff };
       });
