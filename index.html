@@ -522,7 +522,7 @@
   function calcDiff(nA, nB) {
     if (nA === null || nB === null) return { diff: null, pct: null };
     const diff = nA - nB;                                    // A(HQ) − B(Wistron)
-    const pct  = nA !== 0 ? (diff / Math.abs(nA)) * 100 : null;
+    const pct  = nB !== 0 ? (diff / Math.abs(nB)) * 100 : null; // base = Wistron(B)
     return { diff, pct };
   }
 
