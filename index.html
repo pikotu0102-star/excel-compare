@@ -447,16 +447,21 @@
   const ITEM_IDX = 1;
 
   // ── Find header row ───────────────────────────────────────────
-  // The header row labels the data columns. Heuristic: first row where
-  // the item column contains a header keyword, OR first row with 3+ non-empty cells.
+  // Prefer the first row where ITEM_IDX contains a header keyword.
+  // Fallback: first row where ITEM_IDX has any text AND another column also has text.
   function findHeaderRow(data) {
-    for (let r = 0; r < Math.min(data.length, 6); r++) {
+    // Strong match: col B has an explicit "Item"-like label
+    for (let r = 0; r < Math.min(data.length, 10); r++) {
       const item = String(data[r]?.[ITEM_IDX] ?? '').trim();
-      if (/^(item|description|品名|項目|name)/i.test(item)) return r;
+      if (/^(item|description|品名|項目|name)$/i.test(item)) return r;
     }
-    for (let r = 0; r < Math.min(data.length, 6); r++) {
-      const row = data[r] || [];
-      if (row.filter(v => String(v ?? '').trim() !== '').length >= 3) return r;
+    // Weak match: col B has any text AND at least one other column has text
+    for (let r = 0; r < Math.min(data.length, 10); r++) {
+      const row  = data[r] || [];
+      const item = String(row[ITEM_IDX] ?? '').trim();
+      if (!item) continue;
+      const otherHasText = row.some((v, i) => i !== ITEM_IDX && String(v ?? '').trim() !== '');
+      if (otherHasText) return r;
     }
     return 0;
   }
@@ -464,14 +469,18 @@
   // ── Discover value columns from header row ────────────────────
   // Returns columns (other than ITEM_IDX) that have a header label AND
   // at least one non-empty data cell in the rows below.
+  // Header labels that should never be treated as value columns
+  const SKIP_COL_LABELS = /^(item|description|品名|項目|name|no\.?|#|序號|備註|remark)$/i;
+
   function discoverCols(data, hdrRow) {
     const hdr = data[hdrRow] || [];
     const result = [];
     for (let c = 0; c < hdr.length; c++) {
-      if (c === ITEM_IDX) continue;
+      if (c === 0 || c === ITEM_IDX) continue; // skip col A (often row-numbers) and item col
       const label = String(hdr[c] ?? '').trim();
       if (!label) continue;
-      // Only include columns that contain at least one numeric value (skip text-only columns)
+      if (SKIP_COL_LABELS.test(label)) continue; // skip item-like header labels
+      // Only include columns with at least one numeric value
       let hasNumeric = false;
       for (let r = hdrRow + 1; r < Math.min(data.length, hdrRow + 50); r++) {
         const v = String(data[r]?.[c] ?? '').trim();
@@ -482,11 +491,19 @@
     return result;
   }
 
+  // Keywords in ITEM_IDX that identify header/label rows (not real data rows)
+  const HEADER_ITEM_LABELS = /^(item|total nre cost|hp pay|description|品名|項目|name)$/i;
+
   // ── Skip blank / comment / title-only rows ────────────────────
   function shouldSkip(row, dataCols) {
     if (!row || row.every(v => String(v ?? '').trim() === '')) return true;
     const item = String(row[ITEM_IDX] ?? '').trim();
     if (!item) return true;
+    // Skip rows where col B is a header keyword (header row leaked into data)
+    if (HEADER_ITEM_LABELS.test(item)) return true;
+    // Skip rows where col A (idx 0) is a plain number (row-sequence numbers)
+    const col0 = String(row[0] ?? '').trim();
+    if (col0 !== '' && /^\d+$/.test(col0)) return true;
     if (item.startsWith('*')) return true;
     if (/will be paid/i.test(item)) return true;
     if (/^note$/i.test(item)) return true;
