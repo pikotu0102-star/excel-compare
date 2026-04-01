@@ -504,6 +504,10 @@
     // Skip rows where col A (idx 0) is a plain number (row-sequence numbers)
     const col0 = String(row[0] ?? '').trim();
     if (col0 !== '' && /^\d+$/.test(col0)) return true;
+    // Skip item col that is a plain number
+    if (/^\d+$/.test(item)) return true;
+    // Skip project/model title rows (start with a 4-digit year, or contain product names)
+    if (/^\d{4}\s|omnibook/i.test(item)) return true;
     if (item.startsWith('*')) return true;
     if (/will be paid/i.test(item)) return true;
     if (/^note$/i.test(item)) return true;
@@ -517,7 +521,7 @@
 
   function calcDiff(nA, nB) {
     if (nA === null || nB === null) return { diff: null, pct: null };
-    const diff = nB - nA;
+    const diff = nA - nB;                                    // A(HQ) − B(Wistron)
     const pct  = nA !== 0 ? (diff / Math.abs(nA)) * 100 : null;
     return { diff, pct };
   }
