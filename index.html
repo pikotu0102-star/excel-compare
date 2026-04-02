@@ -231,6 +231,14 @@
     .row-total .td-item { font-weight: 700 !important; color: #f8fafc !important; font-size: .85rem; }
     .row-total td       { border-top: 2px solid rgba(255,255,255,.18) !important; }
 
+    /* ── 調整後 Total row ─────────────────────────── */
+    .row-adj-total td        { background: rgba(96,165,250,.10) !important; border-top: 2px solid rgba(96,165,250,.45) !important; }
+    .row-adj-total .td-item  { font-weight: 700 !important; color: #60a5fa !important; font-size: .85rem; background: rgba(96,165,250,.15) !important; }
+    .row-adj-total .td-a     { color: #93c5fd !important; }
+    .row-adj-total .td-b     { color: #6ee7b7 !important; }
+    .row-adj-total .td-diff  { font-weight: 700 !important; }
+    .row-adj-total .td-pct   { font-weight: 700 !important; }
+
     /* ── Block separator row ──────────────────────── */
     .row-sep td { height: 4px; padding: 0 !important; border: none !important; background: rgba(255,255,255,.05) !important; }
 
@@ -617,6 +625,10 @@
     return /odm.?iur/i.test(name);
   }
 
+  function isNreSummarySheet(name) {
+    return /nre.?summary/i.test(name);
+  }
+
   // ── Parse HQ ODM IUR ─────────────────────────────────────────
   // Blocks start with a title row containing "ODM IUR" / "Wave".
   // Each block has a "Platform Name | Qty | U/P | Total Amt" header row,
@@ -887,8 +899,9 @@
           renderOdmIur(result, sheetName, nameA, nameB);
         } else {
           const result = compareData(data1, data2);
-          renderResults(result, sheetName);
-          showAnalysis(result, sheetName);
+          const isNre = isNreSummarySheet(sheetName);
+          renderResults(result, sheetName, isNre);
+          showAnalysis(result, sheetName, isNre);
         }
       } catch(err) {
         document.getElementById('loadingEl').classList.add('hidden');
@@ -899,7 +912,7 @@
   }
 
   // ── renderResults ─────────────────────────────────────────────
-  function renderResults(result, sheetName) {
+  function renderResults(result, sheetName, isNreSummary = false) {
     const { rows, added, removed, changed, cols } = result;
     const total = added.length + removed.length + changed.length;
     const LIMIT = 500;
@@ -915,9 +928,30 @@
       `<th class="th-val-a">${esc(nameA)}</th><th class="th-val-b">${esc(nameB)}</th><th class="th-diff">差異額(A-B)</th><th class="th-pct">差異%</th>`
     ).join('');
 
-    // Rows
+    // Pre-compute adjusted totals for NRE Summary
+    let adjData = null;
+    if (isNreSummary) {
+      const totalRow = rows.find(r => /^total\b/i.test(r.key.trim()) || /^grand\s+total/i.test(r.key.trim()));
+      if (totalRow) {
+        const addedRows  = rows.filter(r => r.type === 'added');
+        const removedRows = rows.filter(r => r.type === 'removed');
+        adjData = cols.map((_, i) => {
+          const adjA = (totalRow.colData[i].vA.num ?? 0)
+            + removedRows.reduce((s, r) => s + (r.colData[i].vA.num ?? 0), 0);
+          const adjB = (totalRow.colData[i].vB.num ?? 0)
+            + addedRows.reduce((s, r) => s + (r.colData[i].vB.num ?? 0), 0);
+          const { diff, pct } = calcDiff(adjA, adjB);
+          return { adjA, adjB, diff, pct };
+        });
+      }
+    }
+
+    const dir = d => d === null ? '' : d > 0 ? ' diff-up' : d < 0 ? ' diff-down' : ' diff-zero';
+
+    // Rows (for-loop so we can inject adjusted total after Total row)
     let evenIdx = 0;
-    let tbody = rows.slice(0, LIMIT).map(row => {
+    const tbodyParts = [];
+    for (const row of rows.slice(0, LIMIT)) {
       const isTotalRow = /^total\b/i.test(row.key.trim()) || /^grand\s+total/i.test(row.key.trim());
       const typeCls  = row.type === 'added' ? 'row-added' : row.type === 'removed' ? 'row-removed' : '';
       const totalCls = isTotalRow ? ' row-total' : '';
@@ -929,17 +963,35 @@
       const colCells = row.colData.map(col => {
         const dirCls  = col.diff === null ? '' : col.diff > 0 ? ' diff-up' : col.diff < 0 ? ' diff-down' : ' diff-zero';
         const cellDiff = (isChanged && (col.hasDiff || col.textDiff)) ? ' cell-diff' : '';
-        return `<td class="td-a${cellDiff}">${esc(fmtNum(col.vA.raw))}</td>` +
-               `<td class="td-b${cellDiff}">${esc(fmtNum(col.vB.raw))}</td>` +
+        // NRE Summary: show "—" for A side when B-only row, or B side when A-only row
+        const aDisplay = (isNreSummary && row.type === 'added'   && col.vA.raw === '') ? '—' : fmtNum(col.vA.raw);
+        const bDisplay = (isNreSummary && row.type === 'removed' && col.vB.raw === '') ? '—' : fmtNum(col.vB.raw);
+        return `<td class="td-a${cellDiff}">${esc(aDisplay)}</td>` +
+               `<td class="td-b${cellDiff}">${esc(bDisplay)}</td>` +
                `<td class="td-diff${dirCls}${cellDiff}">${esc(fmtDiff(col.diff))}</td>` +
                `<td class="td-pct${dirCls}${cellDiff}">${esc(fmtPct(col.pct))}</td>`;
       }).join('');
 
-      return `${sepRow}<tr class="${typeCls}${totalCls}${evenCls}" data-type="${row.type}">
+      tbodyParts.push(`${sepRow}<tr class="${typeCls}${totalCls}${evenCls}" data-type="${row.type}">
         <td class="${itemCls}" title="${esc(row.key)}">${esc(row.key)}</td>
         ${colCells}
-      </tr>`;
-    }).join('');
+      </tr>`);
+
+      // Inject 調整後 Total immediately after the Total row
+      if (isTotalRow && adjData) {
+        const adjCells = adjData.map(d =>
+          `<td class="td-a">${esc(fmtNumOdm(d.adjA))}</td>` +
+          `<td class="td-b">${esc(fmtNumOdm(d.adjB))}</td>` +
+          `<td class="td-diff${dir(d.diff)}">${esc(fmtDiff(d.diff))}</td>` +
+          `<td class="td-pct${dir(d.diff)}">${esc(fmtPct(d.pct))}</td>`
+        ).join('');
+        tbodyParts.push(`<tr class="row-adj-total" data-type="same">
+          <td class="td-item" title="調整後 Total（含獨有項目）">⚖️ 調整後 Total</td>
+          ${adjCells}
+        </tr>`);
+      }
+    }
+    let tbody = tbodyParts.join('');
 
     if (rows.length === 0) {
       tbody = `<tr><td colspan="${totalCols}" class="truncate-notice">（此工作表無可比對的 Item 資料）</td></tr>`;
@@ -1004,8 +1056,8 @@
   }
 
   // ── showAnalysis ──────────────────────────────────────────────
-  function showAnalysis(result, sheetName) {
-    const { added, removed, changed } = result;
+  function showAnalysis(result, sheetName, isNreSummary = false) {
+    const { rows, added, removed, changed, cols } = result;
     const total = added.length + removed.length + changed.length;
     const nameA = document.getElementById('customName1')?.value?.trim() || '檔案A';
     const nameB = document.getElementById('customName2')?.value?.trim() || '檔案B';
@@ -1046,6 +1098,28 @@
       });
       if (added.length > 8) s += `• … 還有 ${added.length - 8} 個\n`;
       s += '\n';
+    }
+
+    // NRE Summary：含獨有項目的最終總金額比較
+    if (isNreSummary) {
+      const totalRow = rows.find(r => /^total\b/i.test(r.key.trim()) || /^grand\s+total/i.test(r.key.trim()));
+      if (totalRow && cols.length > 0) {
+        const addedRows   = rows.filter(r => r.type === 'added');
+        const removedRows = rows.filter(r => r.type === 'removed');
+        s += '💰 含獨有項目的最終總金額比較\n';
+        cols.forEach((col, i) => {
+          const adjA = (totalRow.colData[i].vA.num ?? 0)
+            + removedRows.reduce((acc, r) => acc + (r.colData[i].vA.num ?? 0), 0);
+          const adjB = (totalRow.colData[i].vB.num ?? 0)
+            + addedRows.reduce((acc, r) => acc + (r.colData[i].vB.num ?? 0), 0);
+          const diff = adjA - adjB;
+          const pct  = adjB !== 0 ? (diff / Math.abs(adjB)) * 100 : null;
+          s += `• [${col.label}] ${nameA} 調整後總額：${fmtNumOdm(adjA)}`;
+          s += `　${nameB} 調整後總額：${fmtNumOdm(adjB)}`;
+          s += `　差異：${fmtDiff(diff)}（${fmtPct(pct)}）\n`;
+        });
+        s += '\n';
+      }
     }
 
     s += '💡 建議\n';
