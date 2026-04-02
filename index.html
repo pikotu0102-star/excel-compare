@@ -231,13 +231,13 @@
     .row-total .td-item { font-weight: 700 !important; color: #f8fafc !important; font-size: .85rem; }
     .row-total td       { border-top: 2px solid rgba(255,255,255,.18) !important; }
 
-    /* ── 調整後 Total row ─────────────────────────── */
-    .row-adj-total td        { background: rgba(96,165,250,.10) !important; border-top: 2px solid rgba(96,165,250,.45) !important; }
-    .row-adj-total .td-item  { font-weight: 700 !important; color: #60a5fa !important; font-size: .85rem; background: rgba(96,165,250,.15) !important; }
-    .row-adj-total .td-a     { color: #93c5fd !important; }
-    .row-adj-total .td-b     { color: #6ee7b7 !important; }
-    .row-adj-total .td-diff  { font-weight: 700 !important; }
-    .row-adj-total .td-pct   { font-weight: 700 !important; }
+    /* ── 最終總計 row ────────────────────────────── */
+    .row-final-total td        { background: rgba(251,191,36,.12) !important; border-top: 3px solid rgba(251,191,36,.55) !important; }
+    .row-final-total .td-item  { font-weight: 700 !important; color: #fbbf24 !important; font-size: .9rem !important; background: rgba(251,191,36,.22) !important; letter-spacing: .01em; }
+    .row-final-total .td-a     { font-weight: 700 !important; font-size: .83rem !important; }
+    .row-final-total .td-b     { font-weight: 700 !important; font-size: .83rem !important; }
+    .row-final-total .td-diff  { font-weight: 700 !important; font-size: .83rem !important; }
+    .row-final-total .td-pct   { font-weight: 700 !important; }
 
     /* ── Block separator row ──────────────────────── */
     .row-sep td { height: 4px; padding: 0 !important; border: none !important; background: rgba(255,255,255,.05) !important; }
@@ -977,20 +977,25 @@
         ${colCells}
       </tr>`);
 
-      // Inject 調整後 Total immediately after the Total row
-      if (isTotalRow && adjData) {
-        const adjCells = adjData.map(d =>
-          `<td class="td-a">${esc(fmtNumOdm(d.adjA))}</td>` +
-          `<td class="td-b">${esc(fmtNumOdm(d.adjB))}</td>` +
-          `<td class="td-diff${dir(d.diff)}">${esc(fmtDiff(d.diff))}</td>` +
-          `<td class="td-pct${dir(d.diff)}">${esc(fmtPct(d.pct))}</td>`
-        ).join('');
-        tbodyParts.push(`<tr class="row-adj-total" data-type="same">
-          <td class="td-item" title="調整後 Total（含獨有項目）">⚖️ 調整後 Total</td>
-          ${adjCells}
-        </tr>`);
-      }
     }
+
+    // Append separator + 最終總計 at the very bottom (after BIOS NRE and all exclusive rows)
+    if (adjData) {
+      const finalCells = adjData.map(d =>
+        `<td class="td-a">${esc(fmtNumOdm(d.adjA))}</td>` +
+        `<td class="td-b">${esc(fmtNumOdm(d.adjB))}</td>` +
+        `<td class="td-diff${dir(d.diff)}">${esc(fmtDiff(d.diff))}</td>` +
+        `<td class="td-pct${dir(d.diff)}">${esc(fmtPct(d.pct))}</td>`
+      ).join('');
+      tbodyParts.push(
+        `<tr class="row-sep"><td colspan="${totalCols}"></td></tr>`,
+        `<tr class="row-final-total" data-type="same">
+          <td class="td-item" title="含所有獨有項目的最終總計">🏁 最終總計<br><span style="font-size:.72rem;font-weight:400;color:#a78bfa">含所有獨有項目</span></td>
+          ${finalCells}
+        </tr>`
+      );
+    }
+
     let tbody = tbodyParts.join('');
 
     if (rows.length === 0) {
@@ -1100,13 +1105,15 @@
       s += '\n';
     }
 
-    // NRE Summary：含獨有項目的最終總金額比較
+    // NRE Summary：含獨有項目的最終總成本比較
     if (isNreSummary) {
       const totalRow = rows.find(r => /^total\b/i.test(r.key.trim()) || /^grand\s+total/i.test(r.key.trim()));
       if (totalRow && cols.length > 0) {
         const addedRows   = rows.filter(r => r.type === 'added');
         const removedRows = rows.filter(r => r.type === 'removed');
-        s += '💰 含獨有項目的最終總金額比較\n';
+        s += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+        s += '🏁 最終總成本比較（含所有獨有項目）\n';
+        s += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
         cols.forEach((col, i) => {
           const adjA = (totalRow.colData[i].vA.num ?? 0)
             + removedRows.reduce((acc, r) => acc + (r.colData[i].vA.num ?? 0), 0);
@@ -1114,11 +1121,12 @@
             + addedRows.reduce((acc, r) => acc + (r.colData[i].vB.num ?? 0), 0);
           const diff = adjA - adjB;
           const pct  = adjB !== 0 ? (diff / Math.abs(adjB)) * 100 : null;
-          s += `• [${col.label}] ${nameA} 調整後總額：${fmtNumOdm(adjA)}`;
-          s += `　${nameB} 調整後總額：${fmtNumOdm(adjB)}`;
-          s += `　差異：${fmtDiff(diff)}（${fmtPct(pct)}）\n`;
+          if (cols.length > 1) s += `▸ ${col.label}\n`;
+          s += `  ${nameA} 最終總成本：$${fmtNumOdm(adjA)}\n`;
+          s += `  ${nameB} 最終總成本：$${fmtNumOdm(adjB)}\n`;
+          s += `  總差異：${fmtDiff(diff)}（${fmtPct(pct)}）\n`;
         });
-        s += '\n';
+        s += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
       }
     }
 
