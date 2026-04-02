@@ -434,6 +434,14 @@
     return n.toLocaleString('zh-TW', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   }
 
+  // ODM IUR 專用：強制當作數字，不套用日期格式
+  function fmtNumOdm(v) {
+    if (v === null || v === undefined || v === '') return '';
+    const n = typeof v === 'number' ? v : parseNum(String(v));
+    if (n === null) return '';
+    return n.toLocaleString('zh-TW', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+
   function fmtDiff(diff) {
     if (diff === null || diff === undefined || typeof diff !== 'number' || isNaN(diff)) return '';
     return (diff > 0 ? '+' : '') + diff.toLocaleString('zh-TW', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -636,6 +644,7 @@
       if (cells.some(c => /^platform.?name$/i.test(c))) {
         colP     = cells.findIndex(c => /^platform.?name$/i.test(c));
         colQty   = cells.findIndex(c => /^qty$/i.test(c));
+        if (colQty < 0 && colP >= 0) colQty = colP + 1; // HQ: Qty 在 Platform Name 右邊一欄(C欄)
         colUp    = cells.findIndex(c => /^u\/p$/i.test(c));
         colTotal = cells.findIndex(c => /total.?amt/i.test(c));
         inData = true;
@@ -646,6 +655,9 @@
       if (inData && colP >= 0) {
         const platform = cells[colP];
         if (!platform || /^(platform|qty|u\/p|total)/i.test(platform)) continue;
+        // 跳過底部重複區塊標頭行
+        if (/^odm.?iur$/i.test(platform)) continue;
+        if (/^free.?sample(\s*\(cpu\))?$/i.test(platform)) continue;
         items.push({
           product, platform,
           qty:      parseNum(cells[colQty]),
@@ -687,8 +699,8 @@
         continue;
       }
 
-      // Sub-header row (WHQ / WCQ) immediately after header row
-      if (r === headerRowIdx + 1 && cells.some(c => /^(whq|wcq)$/i.test(c))) {
+      // Sub-header row (WHQ / WCQ) within 3 rows after header row
+      if (headerRowIdx >= 0 && !inData && r > headerRowIdx && r <= headerRowIdx + 3 && cells.some(c => /^(whq|wcq)$/i.test(c))) {
         const wi = cells.findIndex(c => /^whq$/i.test(c));
         const ci = cells.findIndex(c => /^wcq$/i.test(c));
         if (wi >= 0) colQtyA = wi;
@@ -808,12 +820,12 @@
         tbody += `<tr class="${typeCls}${evenCls}" data-type="${row.type}">
           <td class="td-item" title="${esc(row.product)}">${esc(row.product)}</td>
           <td class="td-a" style="text-align:left">${esc(row.platform)}</td>
-          <td class="td-a${hi(qH)}">${esc(fmtNum(row.qtyA ?? ''))}</td>
-          <td class="td-b${hi(qH)}">${esc(fmtNum(row.qtyB ?? ''))}</td>
-          <td class="td-a${hi(uH)}">${esc(fmtNum(row.upA  ?? ''))}</td>
-          <td class="td-b${hi(uH)}">${esc(fmtNum(row.upB  ?? ''))}</td>
-          <td class="td-a${hi(tH)}">${esc(fmtNum(row.totA ?? ''))}</td>
-          <td class="td-b${hi(tH)}">${esc(fmtNum(row.totB ?? ''))}</td>
+          <td class="td-a${hi(qH)}">${esc(fmtNumOdm(row.qtyA))}</td>
+          <td class="td-b${hi(qH)}">${esc(fmtNumOdm(row.qtyB))}</td>
+          <td class="td-a${hi(uH)}">${esc(fmtNumOdm(row.upA))}</td>
+          <td class="td-b${hi(uH)}">${esc(fmtNumOdm(row.upB))}</td>
+          <td class="td-a${hi(tH)}">${esc(fmtNumOdm(row.totA))}</td>
+          <td class="td-b${hi(tH)}">${esc(fmtNumOdm(row.totB))}</td>
           <td class="td-diff${dir(row.totDiff)}${hi(tH)}">${esc(fmtDiff(row.totDiff))}</td>
           <td class="td-pct${dir(row.totDiff)}${hi(tH)}">${esc(fmtPct(row.totPct))}</td>
         </tr>`;
