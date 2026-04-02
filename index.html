@@ -964,15 +964,24 @@
       const evenCls  = (evenIdx++ % 2 === 1) ? ' row-even' : '';
 
       const colCells = row.colData.map(col => {
-        const dirCls  = col.diff === null ? '' : col.diff > 0 ? ' diff-up' : col.diff < 0 ? ' diff-down' : ' diff-zero';
+        // NRE Summary: for exclusive rows treat missing side as 0 and recalculate diff/pct
+        let effDiff = col.diff, effPct = col.pct;
+        let aDisplay = fmtNum(col.vA.raw);
+        let bDisplay = fmtNum(col.vB.raw);
+        if (isNreSummary && (row.type === 'added' || row.type === 'removed')) {
+          const nA = col.vA.num ?? 0;
+          const nB = col.vB.num ?? 0;
+          effDiff = nA - nB;
+          effPct  = nB !== 0 ? (effDiff / Math.abs(nB)) * 100 : null; // div-by-zero → blank
+          if (row.type === 'added')   aDisplay = '0';
+          if (row.type === 'removed') bDisplay = '0';
+        }
+        const dirCls  = effDiff === null ? '' : effDiff > 0 ? ' diff-up' : effDiff < 0 ? ' diff-down' : ' diff-zero';
         const cellDiff = (isChanged && (col.hasDiff || col.textDiff)) ? ' cell-diff' : '';
-        // NRE Summary: show "—" for A side when B-only row, or B side when A-only row
-        const aDisplay = (isNreSummary && row.type === 'added'   && col.vA.raw === '') ? '—' : fmtNum(col.vA.raw);
-        const bDisplay = (isNreSummary && row.type === 'removed' && col.vB.raw === '') ? '—' : fmtNum(col.vB.raw);
         return `<td class="td-a${cellDiff}">${esc(aDisplay)}</td>` +
                `<td class="td-b${cellDiff}">${esc(bDisplay)}</td>` +
-               `<td class="td-diff${dirCls}${cellDiff}">${esc(fmtDiff(col.diff))}</td>` +
-               `<td class="td-pct${dirCls}${cellDiff}">${esc(fmtPct(col.pct))}</td>`;
+               `<td class="td-diff${dirCls}${cellDiff}">${esc(fmtDiff(effDiff))}</td>` +
+               `<td class="td-pct${dirCls}${cellDiff}">${esc(fmtPct(effPct))}</td>`;
       }).join('');
 
       tbodyParts.push(`${sepRow}<tr class="${typeCls}${totalCls}${evenCls}" data-type="${row.type}">
