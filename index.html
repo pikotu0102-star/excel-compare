@@ -697,26 +697,26 @@
   }
 
   // ── Parse HQ ODM IUR ─────────────────────────────────────────
-  // Platform header: row[1]==null AND row[5] contains "Flip_Marina"
+  // Platform header: row[1]==null AND row[5] contains "Flip_Marina" AND NOT "Total"
   // Data rows:  row[1]=Platform Name  row[2]=Qty  row[3]=U/P  row[4]=Total Amt
   // Subtotal:   row[1]==null AND row[4] is a number
-  // Skip row[1] = 'Platform Name' | 'Remark'
+  // Skip row[1] = 'Platform Name' | 'Qty.' | 'ODM IUR' | 'Free Sample' | 'Free Sample (CPU)' | 'Remark:' | pure number
   function parseHqOdmIur(data) {
     console.log('[HQ] 開始解析，總行數:', data.length);
     const blocks = [];  // { header, key, subtotalAmt, items }
     let cur = null;
+    const SKIP_B = /^(platform\s*name|qty\.?|odm\s*iur|free\s*sample(\s*\(cpu\))?|remark:?)$/i;
 
     for (let r = 0; r < data.length; r++) {
       const row = data[r] || [];
-      const rawB = row[1];
-      const sB = String(rawB ?? '').trim();
+      const sB = String(row[1] ?? '').trim();
       const sC = String(row[2] ?? '').trim();
       const sD = String(row[3] ?? '').trim();
       const sE = String(row[4] ?? '').trim();
       const sF = String(row[5] ?? '').trim();
 
-      // Platform header: B empty AND F contains "Flip_Marina"
-      if (!sB && /flip_?marina/i.test(sF)) {
+      // Platform header: B empty AND F contains "Flip_Marina" AND NOT "Total"
+      if (!sB && /flip_?marina/i.test(sF) && !/total/i.test(sF)) {
         console.log('[HQ] 找到平台行 row', r, ':', sF);
         cur = { header: sF, key: normPlatform(sF), subtotalAmt: null, items: [] };
         blocks.push(cur);
@@ -726,15 +726,26 @@
       if (!cur) continue;
 
       // Skip keyword rows
-      if (/^(platform.?name|remark)$/i.test(sB)) continue;
+      if (sB && SKIP_B.test(sB)) {
+        console.log('[HQ] skip row', r, 'B=', sB);
+        continue;
+      }
+
+      // Skip pure number in B
+      if (sB && /^\d+(\.\d+)?$/.test(sB)) {
+        console.log('[HQ] skip 純數字 row', r, 'B=', sB);
+        continue;
+      }
 
       // Subtotal row: B empty AND row[4] is a number
       if (!sB && typeof row[4] === 'number') {
+        console.log('[HQ] 小計 row', r, '=', row[4]);
         cur.subtotalAmt = row[4]; continue;
       }
 
       // Data row: B has value
       if (sB) {
+        console.log('[HQ] 資料行 row', r, 'B=', sB, 'C=', sC, 'D=', sD, 'E=', sE);
         cur.items.push({
           platform: sB,
           qty:      parseNum(sC),
@@ -749,15 +760,15 @@
   }
 
   // ── Parse Wistron ODM IUR ─────────────────────────────────────
-  // Platform header: row[1]==null AND row[7] contains "Flip_Marina"
+  // Platform header: row[1]==null AND row[7] contains "Flip_Marina" AND NOT "Total"
   // Data rows:  row[1]=item  row[2]=Qty WHQ  row[3]=Qty WCQ  row[4]=U/P  row[5]=Sub WHQ  row[6]=Sub WCQ  row[7]=Total
   // Subtotal:   row[1]==null AND row[7] is a number
-  // Skip row[1] = 'Free Sample' | 'Free Sample (CPU)' | 'ODM IUR' | 'Platform Name'
+  // Skip row[1] = 'Free Sample' | 'Free Sample (CPU)' | 'ODM IUR' | 'Platform Name' | 'Remark:' | pure number
   function parseWistronOdmIur(data) {
     console.log('[Wistron] 開始解析，總行數:', data.length);
     const blocks = [];  // { header, key, subtotalAmtWhq, subtotalAmtWcq, subtotalAmt, items }
     let cur = null;
-    const SKIP_B = /^(free\s*sample(\s*\(cpu\))?|odm\s*iur|platform\s*name)$/i;
+    const SKIP_B = /^(free\s*sample(\s*\(cpu\))?|odm\s*iur|platform\s*name|qty\.?|remark:?)$/i;
 
     for (let r = 0; r < data.length; r++) {
       const row = data[r] || [];
@@ -769,8 +780,8 @@
       const sG = String(row[6] ?? '').trim();
       const sH = String(row[7] ?? '').trim();
 
-      // Platform header: B empty AND H contains "Flip_Marina"
-      if (!sB && /flip_?marina/i.test(sH)) {
+      // Platform header: B empty AND H contains "Flip_Marina" AND NOT "Total"
+      if (!sB && /flip_?marina/i.test(sH) && !/total/i.test(sH)) {
         console.log('[Wistron] 找到平台行 row', r, ':', sH);
         cur = { header: sH, key: normPlatform(sH), subtotalAmtWhq: null, subtotalAmtWcq: null, subtotalAmt: null, items: [] };
         blocks.push(cur);
@@ -780,10 +791,20 @@
       if (!cur) continue;
 
       // Skip keyword rows
-      if (sB && SKIP_B.test(sB)) continue;
+      if (sB && SKIP_B.test(sB)) {
+        console.log('[Wistron] skip row', r, 'B=', sB);
+        continue;
+      }
+
+      // Skip pure number in B
+      if (sB && /^\d+(\.\d+)?$/.test(sB)) {
+        console.log('[Wistron] skip 純數字 row', r, 'B=', sB);
+        continue;
+      }
 
       // Subtotal row: B empty AND row[7] is a number
       if (!sB && typeof row[7] === 'number') {
+        console.log('[Wistron] 小計 row', r, '=', row[7]);
         cur.subtotalAmtWhq = typeof row[5] === 'number' ? row[5] : null;
         cur.subtotalAmtWcq = typeof row[6] === 'number' ? row[6] : null;
         cur.subtotalAmt    = row[7];
@@ -792,6 +813,7 @@
 
       // Data row: B has value
       if (sB) {
+        console.log('[Wistron] 資料行 row', r, 'B=', sB, 'C=', sC, 'D=', sD, 'E=', sE, 'H=', sH);
         cur.items.push({
           platform:   sB,
           qtyWhq:     parseNum(sC),
@@ -809,29 +831,47 @@
   }
 
   // ── Detect ODM IUR format ─────────────────────────────────────
-  // Scans all rows: H col (index 7) has Flip_Marina → wistron; F col (index 5) → hq
+  // Wistron: B='ODM IUR' AND (C='WHQ' OR D='WCQ')
+  // HQ:      B='Platform Name' AND C='Qty.' AND D='U/P'
   function detectOdmFormat(data) {
     console.log('[detectOdmFormat] 總行數:', data.length);
-    console.log('[detectOdmFormat] 前10行 col1/col5/col7:');
+    console.log('[detectOdmFormat] 前10行 col1/col2/col3/col5/col7:');
     for (let i = 0; i < Math.min(10, data.length); i++) {
       const row = data[i] || [];
-      console.log(`  row[${i}] col1=${JSON.stringify(row[1])} col5=${JSON.stringify(row[5])} col7=${JSON.stringify(row[7])}`);
+      console.log(`  row[${i}] col1=${JSON.stringify(row[1])} col2=${JSON.stringify(row[2])} col3=${JSON.stringify(row[3])} col5=${JSON.stringify(row[5])} col7=${JSON.stringify(row[7])}`);
     }
-    for (let i = 0; i < data.length; i++) {
-      const row = data[i] || [];
-      if (row[7] != null && String(row[7]).includes('Flip_Marina')) {
-        console.log('[detectOdmFormat] → wistron (row', i, 'col7:', row[7], ')');
-        return 'wistron';
+
+    let hasOdmIurInB = false, hasWhqOrWcq = false, hasHqHeader = false;
+
+    for (const row of data) {
+      const sB = String(row[1] ?? '').trim();
+      const sC = String(row[2] ?? '').trim();
+      const sD = String(row[3] ?? '').trim();
+      if (/^odm\s*iur$/i.test(sB)) {
+        hasOdmIurInB = true;
+        console.log('[detectOdmFormat] 找到 ODM IUR in B:', sB, '| C:', sC, '| D:', sD);
+      }
+      if (/^whq$/i.test(sC) || /^wcq$/i.test(sD)) {
+        hasWhqOrWcq = true;
+        console.log('[detectOdmFormat] 找到 WHQ/WCQ: C=', sC, 'D=', sD);
+      }
+      if (/^platform\s*name$/i.test(sB) && /^qty\.?$/i.test(sC) && /^u\/p$/i.test(sD)) {
+        hasHqHeader = true;
+        console.log('[detectOdmFormat] 找到 HQ header: B=', sB, 'C=', sC, 'D=', sD);
       }
     }
-    for (let i = 0; i < data.length; i++) {
-      const row = data[i] || [];
-      if (row[5] != null && String(row[5]).includes('Flip_Marina')) {
-        console.log('[detectOdmFormat] → hq (row', i, 'col5:', row[5], ')');
-        return 'hq';
-      }
+
+    console.log('[detectOdmFormat] hasOdmIurInB:', hasOdmIurInB, '| hasWhqOrWcq:', hasWhqOrWcq, '| hasHqHeader:', hasHqHeader);
+
+    if (hasOdmIurInB && hasWhqOrWcq) {
+      console.log('[detectOdmFormat] → wistron');
+      return 'wistron';
     }
-    console.warn('[detectOdmFormat] → unknown，未找到 Flip_Marina');
+    if (hasHqHeader) {
+      console.log('[detectOdmFormat] → hq');
+      return 'hq';
+    }
+    console.warn('[detectOdmFormat] → unknown，無法判斷格式');
     return 'unknown';
   }
 
