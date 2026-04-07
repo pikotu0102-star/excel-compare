@@ -511,6 +511,23 @@
     return XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
   }
 
+  // ── Raw sheet rows (包含空白行，不跳過) ─────────────────────
+  function getRawSheetRows(wb, name) {
+    const ws = wb.Sheets[name];
+    if (!ws || !ws['!ref']) return [];
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const rows = [];
+    for (let r = range.s.r; r <= range.e.r; r++) {
+      const row = [];
+      for (let c = range.s.c; c <= range.e.c; c++) {
+        const cell = ws[XLSX.utils.encode_cell({ r, c })];
+        row.push(cell ? cell.v : null);
+      }
+      rows.push(row);
+    }
+    return rows;
+  }
+
   // Item key column (Excel col B = index 1)
   const ITEM_IDX = 1;
 
@@ -792,17 +809,29 @@
   }
 
   // ── Detect ODM IUR format ─────────────────────────────────────
-  // Scans first 20 rows: H col has Flip_Marina → wistron; F col → hq
+  // Scans all rows: H col (index 7) has Flip_Marina → wistron; F col (index 5) → hq
   function detectOdmFormat(data) {
-    const limit = Math.min(20, data.length);
-    for (let i = 0; i < limit; i++) {
+    console.log('[detectOdmFormat] 總行數:', data.length);
+    console.log('[detectOdmFormat] 前10行 col1/col5/col7:');
+    for (let i = 0; i < Math.min(10, data.length); i++) {
       const row = data[i] || [];
-      if (row[7] && String(row[7]).includes('Flip_Marina')) return 'wistron';
+      console.log(`  row[${i}] col1=${JSON.stringify(row[1])} col5=${JSON.stringify(row[5])} col7=${JSON.stringify(row[7])}`);
     }
-    for (let i = 0; i < limit; i++) {
+    for (let i = 0; i < data.length; i++) {
       const row = data[i] || [];
-      if (row[5] && String(row[5]).includes('Flip_Marina')) return 'hq';
+      if (row[7] != null && String(row[7]).includes('Flip_Marina')) {
+        console.log('[detectOdmFormat] → wistron (row', i, 'col7:', row[7], ')');
+        return 'wistron';
+      }
     }
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i] || [];
+      if (row[5] != null && String(row[5]).includes('Flip_Marina')) {
+        console.log('[detectOdmFormat] → hq (row', i, 'col5:', row[5], ')');
+        return 'hq';
+      }
+    }
+    console.warn('[detectOdmFormat] → unknown，未找到 Flip_Marina');
     return 'unknown';
   }
 
@@ -972,8 +1001,9 @@
 
     setTimeout(() => {
       try {
-        const data1 = getSheetData(workbooks[1], sheetName);
-        const data2 = getSheetData(workbooks[2], sheetName);
+        const isOdm = isOdmIurSheet(sheetName);
+        const data1 = isOdm ? getRawSheetRows(workbooks[1], sheetName) : getSheetData(workbooks[1], sheetName);
+        const data2 = isOdm ? getRawSheetRows(workbooks[2], sheetName) : getSheetData(workbooks[2], sheetName);
         const nameA = document.getElementById('customName1')?.value?.trim() || '檔案A';
         const nameB = document.getElementById('customName2')?.value?.trim() || '檔案B';
 
@@ -992,7 +1022,7 @@
         }
 
         document.getElementById('loadingEl').classList.add('hidden');
-        if (isOdmIurSheet(sheetName)) {
+        if (isOdm) {
           const result = compareOdmIur(data1, data2);
           renderOdmIur(result, sheetName, nameA, nameB);
         } else {
