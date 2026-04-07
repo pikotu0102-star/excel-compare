@@ -685,6 +685,8 @@
   // Subtotal:   B=None, E has number → platform Total Amt
   // Skip B = 'Platform Name' | 'Remark'
   function parseHqOdmIur(data) {
+    const firstRowB = String((data[0] || [])[1] ?? '').trim();
+    console.log('[HQ] 檔案格式偵測 - 第1行B欄:', firstRowB);
     const blocks = [];  // { header, key, subtotalAmt, items }
     let cur = null;
 
@@ -724,6 +726,8 @@
         });
       }
     }
+    console.log('[HQ] 找到平台數量:', blocks.length);
+    console.log('[HQ] 平台列表:', blocks.map(p => p.header));
     return blocks;
   }
 
@@ -733,6 +737,8 @@
   // Subtotal:   B=None AND F, G, H all have numbers → platform Total (H)
   // Skip B = 'Free Sample' | 'Free Sample (CPU)' | 'ODM IUR' | 'Platform Name'
   function parseWistronOdmIur(data) {
+    const firstRowB = String((data[0] || [])[1] ?? '').trim();
+    console.log('[Wistron] 檔案格式偵測 - 第1行B欄:', firstRowB);
     const blocks = [];  // { header, key, subtotalAmtWhq, subtotalAmtWcq, subtotalAmt, items }
     let cur = null;
     const SKIP_B = /^(free\s*sample(\s*\(cpu\))?|odm\s*iur|platform\s*name)$/i;
@@ -783,6 +789,8 @@
         });
       }
     }
+    console.log('[Wistron] 找到平台數量:', blocks.length);
+    console.log('[Wistron] 平台列表:', blocks.map(p => p.header));
     return blocks;
   }
 
@@ -886,6 +894,16 @@
     const rowsA = fmtA === 'wistron' ? buildARows(aBlocks) : buildBRows(aBlocks);
     const rowsB = fmtB === 'wistron' ? buildARows(bBlocks) : buildBRows(bBlocks);
 
+    console.log('[renderOdmIur] fmtA:', fmtA, '/ fmtB:', fmtB);
+
+    const fmtDebugBox = (label, fmt, blocks) => `
+      <div style="background:#1e293b;border:1px solid #334155;border-radius:6px;padding:8px 12px;font-size:11px;color:#94a3b8;font-family:monospace;">
+        <b style="color:#f8fafc">[DEBUG] ${esc(label)}</b><br>
+        格式：<span style="color:${fmt==='wistron'?'#60a5fa':'#34d399'}">${fmt === 'wistron' ? 'Wistron（7欄）' : 'HQ（4欄）'}</span>
+        平台數：<span style="color:#fbbf24">${blocks.length}</span><br>
+        前3平台：${blocks.slice(0,3).map(p=>esc(p.header)).join('、') || '（無）'}
+      </div>`;
+
     const html = `
       <div class="stats-row">
         <div class="stat-card"><div class="stat-number" style="color:#60a5fa">${aBlocks.length}</div><div class="stat-label">${esc(nameA)} 平台數</div></div>
@@ -896,12 +914,14 @@
         <div class="odm-panels">
           <div class="odm-panel odm-panel-wis">
             <div class="odm-panel-title">🔵 ${esc(nameA)}</div>
+            ${fmtDebugBox(nameA, fmtA, aBlocks)}
             <div class="odm-panel-scroll">
               <table><thead><tr>${thA}</tr></thead><tbody>${rowsA}</tbody></table>
             </div>
           </div>
           <div class="odm-panel odm-panel-hq">
             <div class="odm-panel-title">🟢 ${esc(nameB)}</div>
+            ${fmtDebugBox(nameB, fmtB, bBlocks)}
             <div class="odm-panel-scroll">
               <table><thead><tr>${thB}</tr></thead><tbody>${rowsB}</tbody></table>
             </div>
