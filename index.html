@@ -699,13 +699,19 @@
   // ── Parse HQ ODM IUR ─────────────────────────────────────────
   // col0=Platform(B)  col1=Qty(C)  col2=U/P(D)  col3=Total(E)  col4=PlatHdr(F)
   // Platform header: col0 null AND col4 contains "Flip_Marina" AND NOT "Total"
+  // Data row:        col0 has value AND col1 is number
   // Subtotal:        col0 null AND col3 is number
-  // Skip col0 = 'Platform Name' | 'Remark:'
   function parseHqOdmIur(data) {
     console.log('[HQ] 開始解析，總行數:', data.length);
+
+    // 診斷：列出所有 col4 有值的行
+    console.log('[HQ] 所有 col4 有值的行:');
+    data.forEach((row, i) => {
+      if (row[4] != null) console.log(`  HQ row[${i}] col4=${JSON.stringify(row[4])} col0=${JSON.stringify(row[0])}`);
+    });
+
     const blocks = [];
     let cur = null;
-    const SKIP_0 = /^(platform\s*name|remark:?)$/i;
 
     for (let r = 0; r < data.length; r++) {
       const row = data[r] || [];
@@ -725,12 +731,6 @@
 
       if (!cur) continue;
 
-      // Skip keyword rows
-      if (s0 && SKIP_0.test(s0)) {
-        console.log('[HQ] skip row', r, 'col0=', s0);
-        continue;
-      }
-
       // Subtotal row: col0 empty AND col3 is number
       if (!s0 && typeof row[3] === 'number') {
         console.log('[HQ] 小計 row', r, 'col3=', row[3]);
@@ -738,15 +738,17 @@
         continue;
       }
 
-      // Data row: col0 has value
-      if (s0) {
+      // Data row: col0 has value AND col1 is number (Qty)
+      if (s0 && typeof row[1] === 'number') {
         console.log('[HQ] 資料行 row', r, 'col0=', s0, 'col1=', s1, 'col2=', s2, 'col3=', s3);
         cur.items.push({
           platform: s0,
-          qty:      parseNum(s1),
+          qty:      row[1],
           up:       parseNum(s2),
           totalAmt: parseNum(s3),
         });
+      } else if (s0) {
+        console.log('[HQ] skip non-data row', r, 'col0=', s0, 'col1=', JSON.stringify(row[1]));
       }
     }
     console.log('[HQ] 找到平台數量:', blocks.length);
