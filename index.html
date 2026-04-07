@@ -750,7 +750,26 @@
     }
     console.log('[HQ] 找到平台數量:', blocks.length);
     console.log('[HQ] 平台列表:', blocks.map(p => p.header));
-    return blocks;
+
+    // Grand Total：讀取工作表內彙總行
+    // col0 含 'Total-Intel'  → col3 (E欄)
+    // col7 含 'Total-Qualcomm' → col10 (L欄)
+    let intelAmt = null, qcomAmt = null;
+    for (const row of data) {
+      const s0  = String(row[0]  ?? '').trim();
+      const s7  = String(row[7]  ?? '').trim();
+      if (/total.?intel/i.test(s0) && typeof row[3] === 'number') {
+        intelAmt = row[3];
+        console.log('[HQ] Total-Intel 彙總行, col3=', intelAmt);
+      }
+      if (/total.?qualcomm/i.test(s7) && typeof row[10] === 'number') {
+        qcomAmt = row[10];
+        console.log('[HQ] Total-Qualcomm 彙總行, col10=', qcomAmt);
+      }
+    }
+    const grandTotal = (intelAmt ?? 0) + (qcomAmt ?? 0);
+    console.log('[HQ] Grand Total = Intel', intelAmt, '+ Qualcomm', qcomAmt, '=', grandTotal);
+    return { blocks, grandTotal };
   }
 
   // ── Parse Wistron ODM IUR ─────────────────────────────────────
@@ -816,7 +835,18 @@
     }
     console.log('[Wistron] 找到平台數量:', blocks.length);
     console.log('[Wistron] 平台列表:', blocks.map(p => p.header));
-    return blocks;
+
+    // Grand Total：加總所有 col0='ODM IUR' 且 col6 是數字的行
+    let grandTotal = 0;
+    for (const row of data) {
+      const s0 = String(row[0] ?? '').trim();
+      if (/^odm\s*iur$/i.test(s0) && typeof row[6] === 'number') {
+        grandTotal += row[6];
+        console.log('[Wistron] ODM IUR 小計行 col6=', row[6], '累計=', grandTotal);
+      }
+    }
+    console.log('[Wistron] Grand Total =', grandTotal);
+    return { blocks, grandTotal };
   }
 
   // ── Detect ODM IUR format ─────────────────────────────────────
@@ -866,20 +896,21 @@
   function compareOdmIur(data1, data2) {
     const fmtA = detectOdmFormat(data1);
     const fmtB = detectOdmFormat(data2);
-    const aBlocks = fmtA === 'wistron' ? parseWistronOdmIur(data1) : parseHqOdmIur(data1);
-    const bBlocks = fmtB === 'wistron' ? parseWistronOdmIur(data2) : parseHqOdmIur(data2);
-    return { aBlocks, bBlocks, fmtA, fmtB };
+    const resA = fmtA === 'wistron' ? parseWistronOdmIur(data1) : parseHqOdmIur(data1);
+    const resB = fmtB === 'wistron' ? parseWistronOdmIur(data2) : parseHqOdmIur(data2);
+    return { aBlocks: resA.blocks, bBlocks: resB.blocks, aGrandTotal: resA.grandTotal, bGrandTotal: resB.grandTotal, fmtA, fmtB };
   }
 
   // ── Render ODM IUR (side-by-side panels) ─────────────────────
   // Each panel uses its own detected format (wistron=7cols, hq=4cols)
   function renderOdmIur(result, sheetName, nameA, nameB) {
-    const { aBlocks, bBlocks, fmtA, fmtB } = result;
+    const { aBlocks, bBlocks, fmtA, fmtB, aGrandTotal, bGrandTotal } = result;
+    const NOTE = '* 此總計來自工作表內的彙總行，可能與 NRE Summary 有所不同';
 
     // File A (Wistron): Platform | Qty WHQ | Qty WCQ | U/P | Sub Amt WHQ | Sub Amt WCQ | Total Amt
-    const buildARows = (blocks) => {
+    const buildARows = (blocks, grandTotal) => {
       if (!blocks.length) return `<tr><td colspan="7" class="truncate-notice">（無資料）</td></tr>`;
-      let grandAmt = 0, rows = '', even = 0;
+      let rows = '', even = 0;
       for (const blk of blocks) {
         rows += `<tr class="odm-plat-hdr"><td colspan="7">${esc(blk.header)}</td></tr>`;
         for (const it of blk.items) {
@@ -894,7 +925,6 @@
           </tr>`;
         }
         if (blk.subtotalAmt !== null) {
-          grandAmt += blk.subtotalAmt;
           rows += `<tr class="odm-subtotal">
             <td>小計</td><td></td><td></td><td></td>
             <td>${esc(fmtNumOdm(blk.subtotalAmtWhq))}</td>
@@ -905,15 +935,16 @@
       }
       rows += `<tr class="odm-grand-total">
         <td>🏁 Grand Total</td><td></td><td></td><td></td><td></td><td></td>
-        <td>${esc(fmtNumOdm(grandAmt))}</td>
-      </tr>`;
+        <td>${esc(fmtNumOdm(grandTotal))}</td>
+      </tr>
+      <tr><td colspan="7" style="font-size:.75rem;color:#94a3b8;padding:4px 8px;font-style:italic;">${esc(NOTE)}</td></tr>`;
       return rows;
     };
 
     // File B (HQ): Platform | Qty | U/P | Total Amt
-    const buildBRows = (blocks) => {
+    const buildBRows = (blocks, grandTotal) => {
       if (!blocks.length) return `<tr><td colspan="4" class="truncate-notice">（無資料）</td></tr>`;
-      let grandAmt = 0, rows = '', even = 0;
+      let rows = '', even = 0;
       for (const blk of blocks) {
         rows += `<tr class="odm-plat-hdr"><td colspan="4">${esc(blk.header)}</td></tr>`;
         for (const it of blk.items) {
@@ -925,7 +956,6 @@
           </tr>`;
         }
         if (blk.subtotalAmt !== null) {
-          grandAmt += blk.subtotalAmt;
           rows += `<tr class="odm-subtotal">
             <td>小計</td><td></td><td></td>
             <td>${esc(fmtNumOdm(blk.subtotalAmt))}</td>
@@ -934,8 +964,9 @@
       }
       rows += `<tr class="odm-grand-total">
         <td>🏁 Grand Total</td><td></td><td></td>
-        <td>${esc(fmtNumOdm(grandAmt))}</td>
-      </tr>`;
+        <td>${esc(fmtNumOdm(grandTotal))}</td>
+      </tr>
+      <tr><td colspan="4" style="font-size:.75rem;color:#94a3b8;padding:4px 8px;font-style:italic;">${esc(NOTE)}</td></tr>`;
       return rows;
     };
 
@@ -951,8 +982,8 @@
 
     const thA = fmtA === 'wistron' ? thWis : thHq;
     const thB = fmtB === 'wistron' ? thWis : thHq;
-    const rowsA = fmtA === 'wistron' ? buildARows(aBlocks) : buildBRows(aBlocks);
-    const rowsB = fmtB === 'wistron' ? buildARows(bBlocks) : buildBRows(bBlocks);
+    const rowsA = fmtA === 'wistron' ? buildARows(aBlocks, aGrandTotal) : buildBRows(aBlocks, aGrandTotal);
+    const rowsB = fmtB === 'wistron' ? buildARows(bBlocks, bGrandTotal) : buildBRows(bBlocks, bGrandTotal);
 
     console.log('[renderOdmIur] fmtA:', fmtA, '/ fmtB:', fmtB);
 
