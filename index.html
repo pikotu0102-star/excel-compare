@@ -786,18 +786,27 @@
     return blocks;
   }
 
+  // ── Detect ODM IUR format ─────────────────────────────────────
+  // Returns 'wistron' if first row B column === 'ODM IUR', else 'hq'
+  function detectOdmFormat(data) {
+    const firstRow = data[0] || [];
+    return String(firstRow[1] ?? '').trim() === 'ODM IUR' ? 'wistron' : 'hq';
+  }
+
   // ── Compare ODM IUR ───────────────────────────────────────────
-  // data1 = file A (Wistron format), data2 = file B (HQ format)
-  // Left panel = file A, right panel = file B
+  // Auto-detect format for each file; left panel = file A, right panel = file B
   function compareOdmIur(data1, data2) {
-    return { aBlocks: parseWistronOdmIur(data1), bBlocks: parseHqOdmIur(data2) };
+    const fmtA = detectOdmFormat(data1);
+    const fmtB = detectOdmFormat(data2);
+    const aBlocks = fmtA === 'wistron' ? parseWistronOdmIur(data1) : parseHqOdmIur(data1);
+    const bBlocks = fmtB === 'wistron' ? parseWistronOdmIur(data2) : parseHqOdmIur(data2);
+    return { aBlocks, bBlocks, fmtA, fmtB };
   }
 
   // ── Render ODM IUR (side-by-side panels) ─────────────────────
-  // Left  = file A (Wistron): 7 cols
-  // Right = file B (HQ):      4 cols
+  // Each panel uses its own detected format (wistron=7cols, hq=4cols)
   function renderOdmIur(result, sheetName, nameA, nameB) {
-    const { aBlocks, bBlocks } = result;
+    const { aBlocks, bBlocks, fmtA, fmtB } = result;
 
     // File A (Wistron): Platform | Qty WHQ | Qty WCQ | U/P | Sub Amt WHQ | Sub Amt WCQ | Total Amt
     const buildARows = (blocks) => {
@@ -862,15 +871,20 @@
       return rows;
     };
 
-    const thA = `
+    const thWis = `
       <th style="text-align:left;min-width:110px">Platform</th>
       <th>Qty<br><small>WHQ</small></th><th>Qty<br><small>WCQ</small></th>
       <th>U/P</th>
       <th>Sub Amt<br><small>WHQ</small></th><th>Sub Amt<br><small>WCQ</small></th>
       <th>Total Amt</th>`;
-    const thB = `
+    const thHq = `
       <th style="text-align:left;min-width:110px">Platform</th>
       <th>Qty</th><th>U/P</th><th>Total Amt</th>`;
+
+    const thA = fmtA === 'wistron' ? thWis : thHq;
+    const thB = fmtB === 'wistron' ? thWis : thHq;
+    const rowsA = fmtA === 'wistron' ? buildARows(aBlocks) : buildBRows(aBlocks);
+    const rowsB = fmtB === 'wistron' ? buildARows(bBlocks) : buildBRows(bBlocks);
 
     const html = `
       <div class="stats-row">
@@ -883,13 +897,13 @@
           <div class="odm-panel odm-panel-wis">
             <div class="odm-panel-title">🔵 ${esc(nameA)}</div>
             <div class="odm-panel-scroll">
-              <table><thead><tr>${thA}</tr></thead><tbody>${buildARows(aBlocks)}</tbody></table>
+              <table><thead><tr>${thA}</tr></thead><tbody>${rowsA}</tbody></table>
             </div>
           </div>
           <div class="odm-panel odm-panel-hq">
             <div class="odm-panel-title">🟢 ${esc(nameB)}</div>
             <div class="odm-panel-scroll">
-              <table><thead><tr>${thB}</tr></thead><tbody>${buildBRows(bBlocks)}</tbody></table>
+              <table><thead><tr>${thB}</tr></thead><tbody>${rowsB}</tbody></table>
             </div>
           </div>
         </div>
@@ -909,7 +923,14 @@
     for (let r = data.length - 1; r >= 0; r--) {
       const row = data[r] || [];
       const ver  = String(row[0] ?? '').trim();
-      const date = String(row[2] ?? '').trim();
+      const rawDate = row[2];
+      let date = '';
+      if (typeof rawDate === 'number' && rawDate > 40000 && rawDate < 60000) {
+        const d = new Date((rawDate - 25569) * 86400 * 1000);
+        date = `${d.getUTCFullYear()}/${String(d.getUTCMonth()+1).padStart(2,'0')}/${String(d.getUTCDate()).padStart(2,'0')}`;
+      } else {
+        date = String(rawDate ?? '').trim();
+      }
       if (ver) return { ver, date };
     }
     return null;
