@@ -698,9 +698,9 @@
 
   // ── Parse HQ ODM IUR ─────────────────────────────────────────
   // col0=Platform(B)  col1=Qty(C)  col2=U/P(D)  col3=Total(E)  col4=PlatHdr(F)
-  // Platform header: col0 null AND col4 contains "Flip_Marina" AND NOT "Total"
-  // Data row:        col0 has value AND col1 is number
-  // Subtotal:        col0 null AND col3 is number
+  // Platform header: col4 contains "Flip_Marina" (col0 不限)
+  // Data row:        col0 有值 AND col0 不是 'Platform Name'/'Remark:'/'ODM IUR...' AND col1 是數字
+  // Subtotal:        col0 null AND col3 是數字
   function parseHqOdmIur(data) {
     console.log('[HQ] 開始解析，總行數:', data.length);
 
@@ -712,6 +712,7 @@
 
     const blocks = [];
     let cur = null;
+    const SKIP_0 = /^(platform\s*name|remark:?|odm\s*iur)/i;
 
     for (let r = 0; r < data.length; r++) {
       const row = data[r] || [];
@@ -721,9 +722,9 @@
       const s3 = String(row[3] ?? '').trim();  // E欄 Total
       const s4 = String(row[4] ?? '').trim();  // F欄 Platform header
 
-      // Platform header: col0 empty AND col4 has Flip_Marina AND NOT Total
-      if (!s0 && /flip_?marina/i.test(s4) && !/total/i.test(s4)) {
-        console.log('[HQ] 找到平台行 row', r, 'col4=', s4);
+      // Platform header: col4 has Flip_Marina (col0 不限)
+      if (/flip_?marina/i.test(s4)) {
+        console.log('[HQ] 找到平台行 row', r, 'col4=', s4, 'col0=', s0);
         cur = { header: s4, key: normPlatform(s4), subtotalAmt: null, items: [] };
         blocks.push(cur);
         continue;
@@ -738,8 +739,8 @@
         continue;
       }
 
-      // Data row: col0 has value AND col1 is number (Qty)
-      if (s0 && typeof row[1] === 'number') {
+      // Data row: col0 有值 AND 不是 skip 關鍵字 AND col1 是數字
+      if (s0 && !SKIP_0.test(s0) && typeof row[1] === 'number') {
         console.log('[HQ] 資料行 row', r, 'col0=', s0, 'col1=', s1, 'col2=', s2, 'col3=', s3);
         cur.items.push({
           platform: s0,
@@ -748,7 +749,7 @@
           totalAmt: parseNum(s3),
         });
       } else if (s0) {
-        console.log('[HQ] skip non-data row', r, 'col0=', s0, 'col1=', JSON.stringify(row[1]));
+        console.log('[HQ] skip row', r, 'col0=', s0, 'col1=', JSON.stringify(row[1]));
       }
     }
     console.log('[HQ] 找到平台數量:', blocks.length);
