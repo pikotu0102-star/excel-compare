@@ -665,155 +665,195 @@
   }
 
   // ── Parse HQ ODM IUR ─────────────────────────────────────────
-  // Platform title: F column (index 5), non-numeric text
-  // Data rows:  B=item name  C=Qty  D=U/P  (Sub Amt = C×D)
-  // Subtotal:   B/C/D empty, E has number → Total Amt for the block
+  // Platform header: F column (index 5) contains "Flip_Marina"
+  // Data rows:  B=Platform Name  C=Qty  D=U/P  E=Total Amt (per row)
+  // Subtotal:   B=None, E has number → platform Total Amt
+  // Skip B = 'Platform Name' | 'Remark'
   function parseHqOdmIur(data) {
-    const blocks = [];  // { header, key, totalQty, subtotalAmt, items }
+    const blocks = [];  // { header, key, subtotalAmt, items }
     let cur = null;
 
     for (let r = 0; r < data.length; r++) {
       const row = data[r] || [];
-      const sB  = String(row[1] ?? '').trim();
-      const sC  = String(row[2] ?? '').trim();
-      const sD  = String(row[3] ?? '').trim();
-      const sE  = String(row[4] ?? '').trim();
-      const sF  = String(row[5] ?? '').trim();
+      const sB = String(row[1] ?? '').trim();
+      const sC = String(row[2] ?? '').trim();
+      const sD = String(row[3] ?? '').trim();
+      const sE = String(row[4] ?? '').trim();
+      const sF = String(row[5] ?? '').trim();
 
-      if (!sB && !sC && !sD && !sE && !sF) continue;
-
-      // Platform header: F has non-empty, non-numeric, non-keyword text
-      if (sF && parseNum(sF) === null &&
-          !/^(platform|qty|u\/p|total|sub|odm|free\s*sample|wave)/i.test(sF)) {
-        cur = { header: sF, key: normPlatform(sF), totalQty: 0, subtotalAmt: null, items: [] };
+      // Platform header: F contains "Flip_Marina"
+      if (/flip_?marina/i.test(sF)) {
+        cur = { header: sF, key: normPlatform(sF), subtotalAmt: null, items: [] };
         blocks.push(cur);
         continue;
       }
 
       if (!cur) continue;
 
-      // Subtotal row: B/C/D empty, E has number
-      if (!sB && !sC && !sD && sE) {
+      // Skip keyword rows
+      if (/^(platform.?name|remark)$/i.test(sB)) continue;
+
+      // Subtotal row: B empty, E has number
+      if (!sB && sE) {
         const amt = parseNum(sE);
         if (amt !== null) { cur.subtotalAmt = amt; continue; }
       }
 
-      // Data row: B has item name (not a keyword)
-      if (sB && !/^(platform.?name|qty|u\/p|total|sub|odm|free\s*sample)/i.test(sB)) {
-        const qty    = parseNum(sC);
-        const up     = parseNum(sD);
-        const subAmt = qty !== null && up !== null ? qty * up : null;
-        if (qty !== null) cur.totalQty += qty;
-        cur.items.push({ platform: sB, qty, up, subAmt });
+      // Data row: B has value
+      if (sB) {
+        cur.items.push({
+          platform: sB,
+          qty:      parseNum(sC),
+          up:       parseNum(sD),
+          totalAmt: parseNum(sE),
+        });
       }
     }
     return blocks;
   }
 
   // ── Parse Wistron ODM IUR ─────────────────────────────────────
-  // Platform title: H column (index 7), non-numeric text
-  // Data rows:  B=item  C=Qty WHQ  D=Qty WCQ  E=U/P  F=Sub WHQ  G=Sub WCQ  H=Total Amt
-  // Subtotal:   B/C/D/E empty, H has number
+  // Platform header: B=None AND H contains "Flip_Marina"
+  // Data rows:  B=item  C=Qty WHQ  D=Qty WCQ  E=U/P  F=Sub amt WHQ  G=Sub amt WCQ  H=Total Amt
+  // Subtotal:   B=None AND F, G, H all have numbers → platform Total (H)
+  // Skip B = 'Free Sample' | 'Free Sample (CPU)' | 'ODM IUR' | 'Platform Name'
   function parseWistronOdmIur(data) {
-    const blocks = [];  // { header, key, totalQtyWhq, totalQtyWcq, subtotalAmt, items }
+    const blocks = [];  // { header, key, subtotalAmtWhq, subtotalAmtWcq, subtotalAmt, items }
     let cur = null;
+    const SKIP_B = /^(free\s*sample(\s*\(cpu\))?|odm\s*iur|platform\s*name)$/i;
 
     for (let r = 0; r < data.length; r++) {
       const row = data[r] || [];
-      const sB  = String(row[1] ?? '').trim();
-      const sC  = String(row[2] ?? '').trim();
-      const sD  = String(row[3] ?? '').trim();
-      const sE  = String(row[4] ?? '').trim();
-      const sF  = String(row[5] ?? '').trim();
-      const sG  = String(row[6] ?? '').trim();
-      const sH  = String(row[7] ?? '').trim();
+      const sB = String(row[1] ?? '').trim();
+      const sC = String(row[2] ?? '').trim();
+      const sD = String(row[3] ?? '').trim();
+      const sE = String(row[4] ?? '').trim();
+      const sF = String(row[5] ?? '').trim();
+      const sG = String(row[6] ?? '').trim();
+      const sH = String(row[7] ?? '').trim();
 
-      if (!sB && !sC && !sD && !sE && !sF && !sG && !sH) continue;
-
-      // Platform header: H has non-empty, non-numeric, non-keyword text
-      if (sH && parseNum(sH) === null &&
-          !/^(platform|qty|total|sub|whq|wcq|u\/p|odm|free\s*sample|wave)/i.test(sH)) {
-        cur = { header: sH, key: normPlatform(sH), totalQtyWhq: 0, totalQtyWcq: 0, subtotalAmt: null, items: [] };
+      // Platform header: B empty AND H contains "Flip_Marina"
+      if (!sB && /flip_?marina/i.test(sH)) {
+        cur = { header: sH, key: normPlatform(sH), subtotalAmtWhq: null, subtotalAmtWcq: null, subtotalAmt: null, items: [] };
         blocks.push(cur);
         continue;
       }
 
       if (!cur) continue;
 
-      // Subtotal row: B/C/D/E empty, H has number
-      if (!sB && !sC && !sD && !sE && sH) {
-        const amt = parseNum(sH);
-        if (amt !== null) { cur.subtotalAmt = amt; continue; }
+      // Skip keyword rows
+      if (sB && SKIP_B.test(sB)) continue;
+
+      // Subtotal row: B empty AND F, G, H all have numbers
+      if (!sB && sF && sG && sH) {
+        const amtF = parseNum(sF), amtG = parseNum(sG), amtH = parseNum(sH);
+        if (amtF !== null && amtG !== null && amtH !== null) {
+          cur.subtotalAmtWhq = amtF;
+          cur.subtotalAmtWcq = amtG;
+          cur.subtotalAmt    = amtH;
+          continue;
+        }
       }
 
-      // Data row: B has item name (not a keyword)
-      if (sB && !/^(platform.?name|qty|total|sub|whq|wcq|u\/p|odm|free\s*sample)/i.test(sB)) {
-        const qtyWhq   = parseNum(sC) ?? 0;
-        const qtyWcq   = parseNum(sD) ?? 0;
-        const up       = parseNum(sE);
-        const subAmtWhq = parseNum(sF) ?? (up !== null ? qtyWhq * up : null);
-        const subAmtWcq = parseNum(sG) ?? (up !== null ? qtyWcq * up : null);
-        const subAmt   = (subAmtWhq ?? 0) + (subAmtWcq ?? 0);
-        cur.totalQtyWhq += qtyWhq;
-        cur.totalQtyWcq += qtyWcq;
-        cur.items.push({ platform: sB, qty: qtyWhq + qtyWcq, qtyWhq, qtyWcq, up, subAmt });
+      // Data row: B has value
+      if (sB) {
+        cur.items.push({
+          platform:   sB,
+          qtyWhq:     parseNum(sC),
+          qtyWcq:     parseNum(sD),
+          up:         parseNum(sE),
+          subAmtWhq:  parseNum(sF),
+          subAmtWcq:  parseNum(sG),
+          totalAmt:   parseNum(sH),
+        });
       }
     }
     return blocks;
   }
 
   // ── Compare ODM IUR ───────────────────────────────────────────
-  // Simply parses both files and returns block lists for side-by-side rendering
   function compareOdmIur(data1, data2) {
-    return {
-      hqBlocks:  parseHqOdmIur(data1),
-      wisBlocks: parseWistronOdmIur(data2),
-    };
+    return { hqBlocks: parseHqOdmIur(data1), wisBlocks: parseWistronOdmIur(data2) };
   }
 
   // ── Render ODM IUR (side-by-side panels) ─────────────────────
   function renderOdmIur(result, sheetName, nameA, nameB) {
     const { hqBlocks, wisBlocks } = result;
 
-    const buildPanel = (blocks) => {
-      if (blocks.length === 0)
-        return `<tr><td colspan="5" class="truncate-notice">（無資料）</td></tr>`;
-
-      let grandAmt = 0;
-      let rows = '';
-      let evenIdx = 0;
-
-      for (const block of blocks) {
-        rows += `<tr class="odm-plat-hdr"><td colspan="5">${esc(block.header)}</td></tr>`;
-        for (const item of block.items) {
-          const evenCls = (evenIdx++ % 2 === 1) ? ' odm-data-even' : '';
-          rows += `<tr class="${evenCls}">
-            <td>${esc(item.platform)}</td>
-            <td>${esc(fmtNumOdm(item.qty))}</td>
-            <td>${esc(fmtNumOdm(item.up))}</td>
-            <td>${esc(fmtNumOdm(item.subAmt))}</td>
-            <td></td>
+    // Build HQ tbody: Platform | Qty | U/P | Total Amt  (4 cols)
+    const buildHqRows = (blocks) => {
+      if (!blocks.length) return `<tr><td colspan="4" class="truncate-notice">（無資料）</td></tr>`;
+      let grandAmt = 0, rows = '', even = 0;
+      for (const blk of blocks) {
+        rows += `<tr class="odm-plat-hdr"><td colspan="4">${esc(blk.header)}</td></tr>`;
+        for (const it of blk.items) {
+          rows += `<tr class="${even++ % 2 ? 'odm-data-even' : ''}">
+            <td>${esc(it.platform)}</td>
+            <td>${esc(fmtNumOdm(it.qty))}</td>
+            <td>${esc(fmtNumOdm(it.up))}</td>
+            <td>${esc(fmtNumOdm(it.totalAmt))}</td>
           </tr>`;
         }
-        if (block.subtotalAmt !== null) {
-          grandAmt += block.subtotalAmt;
+        if (blk.subtotalAmt !== null) {
+          grandAmt += blk.subtotalAmt;
           rows += `<tr class="odm-subtotal">
-            <td>小計</td><td></td><td></td><td></td>
-            <td>${esc(fmtNumOdm(block.subtotalAmt))}</td>
+            <td>小計</td><td></td><td></td>
+            <td>${esc(fmtNumOdm(blk.subtotalAmt))}</td>
           </tr>`;
         }
       }
-
       rows += `<tr class="odm-grand-total">
-        <td>🏁 Grand Total</td><td></td><td></td><td></td>
+        <td>🏁 Grand Total</td><td></td><td></td>
         <td>${esc(fmtNumOdm(grandAmt))}</td>
       </tr>`;
-
       return rows;
     };
 
-    const thHq = `<th>Platform</th><th>Qty</th><th>U/P</th><th>Sub Amt</th><th>Total Amt</th>`;
-    const thWis = `<th>Platform</th><th>Qty<br><small>(WHQ+WCQ)</small></th><th>U/P</th><th>Sub Amt</th><th>Total Amt</th>`;
+    // Build Wistron tbody: Platform | Qty WHQ | Qty WCQ | U/P | Sub WHQ | Sub WCQ | Total Amt  (7 cols)
+    const buildWisRows = (blocks) => {
+      if (!blocks.length) return `<tr><td colspan="7" class="truncate-notice">（無資料）</td></tr>`;
+      let grandAmt = 0, rows = '', even = 0;
+      for (const blk of blocks) {
+        rows += `<tr class="odm-plat-hdr"><td colspan="7">${esc(blk.header)}</td></tr>`;
+        for (const it of blk.items) {
+          rows += `<tr class="${even++ % 2 ? 'odm-data-even' : ''}">
+            <td>${esc(it.platform)}</td>
+            <td>${esc(fmtNumOdm(it.qtyWhq))}</td>
+            <td>${esc(fmtNumOdm(it.qtyWcq))}</td>
+            <td>${esc(fmtNumOdm(it.up))}</td>
+            <td>${esc(fmtNumOdm(it.subAmtWhq))}</td>
+            <td>${esc(fmtNumOdm(it.subAmtWcq))}</td>
+            <td>${esc(fmtNumOdm(it.totalAmt))}</td>
+          </tr>`;
+        }
+        if (blk.subtotalAmt !== null) {
+          grandAmt += blk.subtotalAmt;
+          rows += `<tr class="odm-subtotal">
+            <td>小計</td><td></td><td></td><td></td>
+            <td>${esc(fmtNumOdm(blk.subtotalAmtWhq))}</td>
+            <td>${esc(fmtNumOdm(blk.subtotalAmtWcq))}</td>
+            <td>${esc(fmtNumOdm(blk.subtotalAmt))}</td>
+          </tr>`;
+        }
+      }
+      rows += `<tr class="odm-grand-total">
+        <td>🏁 Grand Total</td><td></td><td></td><td></td><td></td><td></td>
+        <td>${esc(fmtNumOdm(grandAmt))}</td>
+      </tr>`;
+      return rows;
+    };
+
+    const thHq = `
+      <th style="text-align:left;min-width:110px">Platform</th>
+      <th>Qty</th><th>U/P</th><th>Total Amt</th>`;
+    const thWis = `
+      <th style="text-align:left;min-width:110px">Platform</th>
+      <th>Qty<br><small>WHQ</small></th>
+      <th>Qty<br><small>WCQ</small></th>
+      <th>U/P</th>
+      <th>Sub Amt<br><small>WHQ</small></th>
+      <th>Sub Amt<br><small>WCQ</small></th>
+      <th>Total Amt</th>`;
 
     const html = `
       <div class="stats-row">
@@ -826,19 +866,13 @@
           <div class="odm-panel odm-panel-hq">
             <div class="odm-panel-title">🔵 ${esc(nameA)}</div>
             <div class="odm-panel-scroll">
-              <table>
-                <thead><tr>${thHq}</tr></thead>
-                <tbody>${buildPanel(hqBlocks)}</tbody>
-              </table>
+              <table><thead><tr>${thHq}</tr></thead><tbody>${buildHqRows(hqBlocks)}</tbody></table>
             </div>
           </div>
           <div class="odm-panel odm-panel-wis">
             <div class="odm-panel-title">🟢 ${esc(nameB)}</div>
             <div class="odm-panel-scroll">
-              <table>
-                <thead><tr>${thWis}</tr></thead>
-                <tbody>${buildPanel(wisBlocks)}</tbody>
-              </table>
+              <table><thead><tr>${thWis}</tr></thead><tbody>${buildWisRows(wisBlocks)}</tbody></table>
             </div>
           </div>
         </div>
