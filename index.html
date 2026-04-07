@@ -310,6 +310,19 @@
     .odm-grand-total td { background: rgba(251,191,36,.12) !important; border-top: 3px solid rgba(251,191,36,.45) !important; color: #fbbf24 !important; font-weight: 700; font-family: 'Noto Sans TC', sans-serif !important; }
     /* Alternating data rows */
     .odm-data-even td { background: rgba(255,255,255,.02); }
+
+    /* ── 版本資訊列 ──────────────────────────────── */
+    .revision-bar {
+      max-width: 900px; margin: -20px auto 20px;
+      background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07);
+      border-radius: 10px; padding: 8px 18px;
+      font-size: .8rem; color: #64748b; text-align: center;
+      display: flex; justify-content: center; gap: 24px; flex-wrap: wrap;
+    }
+    .revision-bar .rev-item { display: flex; align-items: center; gap: 6px; }
+    .revision-bar .rev-label { font-weight: 600; }
+    .revision-bar .rev-a { color: #60a5fa; }
+    .revision-bar .rev-b { color: #34d399; }
   </style>
 </head>
 <body>
@@ -319,6 +332,8 @@
     <h1>📊 Excel 財務報價比對工具</h1>
     <p>支援多工作表 · 以 Item 名稱為識別鍵 · 自動計算差異金額與百分比</p>
   </div>
+
+  <div class="revision-bar hidden" id="revisionBar"></div>
 
   <!-- Upload -->
   <div class="upload-grid">
@@ -681,8 +696,8 @@
       const sE = String(row[4] ?? '').trim();
       const sF = String(row[5] ?? '').trim();
 
-      // Platform header: F contains "Flip_Marina"
-      if (/flip_?marina/i.test(sF)) {
+      // Platform header: B empty AND F contains "Flip_Marina"
+      if (!sB && /flip_?marina/i.test(sF)) {
         cur = { header: sF, key: normPlatform(sF), subtotalAmt: null, items: [] };
         blocks.push(cur);
         continue;
@@ -772,45 +787,20 @@
   }
 
   // ── Compare ODM IUR ───────────────────────────────────────────
+  // data1 = file A (Wistron format), data2 = file B (HQ format)
+  // Left panel = file A, right panel = file B
   function compareOdmIur(data1, data2) {
-    return { hqBlocks: parseHqOdmIur(data1), wisBlocks: parseWistronOdmIur(data2) };
+    return { aBlocks: parseWistronOdmIur(data1), bBlocks: parseHqOdmIur(data2) };
   }
 
   // ── Render ODM IUR (side-by-side panels) ─────────────────────
+  // Left  = file A (Wistron): 7 cols
+  // Right = file B (HQ):      4 cols
   function renderOdmIur(result, sheetName, nameA, nameB) {
-    const { hqBlocks, wisBlocks } = result;
+    const { aBlocks, bBlocks } = result;
 
-    // Build HQ tbody: Platform | Qty | U/P | Total Amt  (4 cols)
-    const buildHqRows = (blocks) => {
-      if (!blocks.length) return `<tr><td colspan="4" class="truncate-notice">（無資料）</td></tr>`;
-      let grandAmt = 0, rows = '', even = 0;
-      for (const blk of blocks) {
-        rows += `<tr class="odm-plat-hdr"><td colspan="4">${esc(blk.header)}</td></tr>`;
-        for (const it of blk.items) {
-          rows += `<tr class="${even++ % 2 ? 'odm-data-even' : ''}">
-            <td>${esc(it.platform)}</td>
-            <td>${esc(fmtNumOdm(it.qty))}</td>
-            <td>${esc(fmtNumOdm(it.up))}</td>
-            <td>${esc(fmtNumOdm(it.totalAmt))}</td>
-          </tr>`;
-        }
-        if (blk.subtotalAmt !== null) {
-          grandAmt += blk.subtotalAmt;
-          rows += `<tr class="odm-subtotal">
-            <td>小計</td><td></td><td></td>
-            <td>${esc(fmtNumOdm(blk.subtotalAmt))}</td>
-          </tr>`;
-        }
-      }
-      rows += `<tr class="odm-grand-total">
-        <td>🏁 Grand Total</td><td></td><td></td>
-        <td>${esc(fmtNumOdm(grandAmt))}</td>
-      </tr>`;
-      return rows;
-    };
-
-    // Build Wistron tbody: Platform | Qty WHQ | Qty WCQ | U/P | Sub WHQ | Sub WCQ | Total Amt  (7 cols)
-    const buildWisRows = (blocks) => {
+    // File A (Wistron): Platform | Qty WHQ | Qty WCQ | U/P | Sub Amt WHQ | Sub Amt WCQ | Total Amt
+    const buildARows = (blocks) => {
       if (!blocks.length) return `<tr><td colspan="7" class="truncate-notice">（無資料）</td></tr>`;
       let grandAmt = 0, rows = '', even = 0;
       for (const blk of blocks) {
@@ -843,36 +833,63 @@
       return rows;
     };
 
-    const thHq = `
+    // File B (HQ): Platform | Qty | U/P | Total Amt
+    const buildBRows = (blocks) => {
+      if (!blocks.length) return `<tr><td colspan="4" class="truncate-notice">（無資料）</td></tr>`;
+      let grandAmt = 0, rows = '', even = 0;
+      for (const blk of blocks) {
+        rows += `<tr class="odm-plat-hdr"><td colspan="4">${esc(blk.header)}</td></tr>`;
+        for (const it of blk.items) {
+          rows += `<tr class="${even++ % 2 ? 'odm-data-even' : ''}">
+            <td>${esc(it.platform)}</td>
+            <td>${esc(fmtNumOdm(it.qty))}</td>
+            <td>${esc(fmtNumOdm(it.up))}</td>
+            <td>${esc(fmtNumOdm(it.totalAmt))}</td>
+          </tr>`;
+        }
+        if (blk.subtotalAmt !== null) {
+          grandAmt += blk.subtotalAmt;
+          rows += `<tr class="odm-subtotal">
+            <td>小計</td><td></td><td></td>
+            <td>${esc(fmtNumOdm(blk.subtotalAmt))}</td>
+          </tr>`;
+        }
+      }
+      rows += `<tr class="odm-grand-total">
+        <td>🏁 Grand Total</td><td></td><td></td>
+        <td>${esc(fmtNumOdm(grandAmt))}</td>
+      </tr>`;
+      return rows;
+    };
+
+    const thA = `
+      <th style="text-align:left;min-width:110px">Platform</th>
+      <th>Qty<br><small>WHQ</small></th><th>Qty<br><small>WCQ</small></th>
+      <th>U/P</th>
+      <th>Sub Amt<br><small>WHQ</small></th><th>Sub Amt<br><small>WCQ</small></th>
+      <th>Total Amt</th>`;
+    const thB = `
       <th style="text-align:left;min-width:110px">Platform</th>
       <th>Qty</th><th>U/P</th><th>Total Amt</th>`;
-    const thWis = `
-      <th style="text-align:left;min-width:110px">Platform</th>
-      <th>Qty<br><small>WHQ</small></th>
-      <th>Qty<br><small>WCQ</small></th>
-      <th>U/P</th>
-      <th>Sub Amt<br><small>WHQ</small></th>
-      <th>Sub Amt<br><small>WCQ</small></th>
-      <th>Total Amt</th>`;
 
     const html = `
       <div class="stats-row">
-        <div class="stat-card"><div class="stat-number" style="color:#60a5fa">${hqBlocks.length}</div><div class="stat-label">${esc(nameA)} 平台數</div></div>
-        <div class="stat-card"><div class="stat-number" style="color:#34d399">${wisBlocks.length}</div><div class="stat-label">${esc(nameB)} 平台數</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:#60a5fa">${aBlocks.length}</div><div class="stat-label">${esc(nameA)} 平台數</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:#34d399">${bBlocks.length}</div><div class="stat-label">${esc(nameB)} 平台數</div></div>
       </div>
       <div class="section" style="padding:16px 20px;">
         <div class="section-title">📋 工作表「${esc(sheetName)}」ODM IUR 資料對照</div>
         <div class="odm-panels">
-          <div class="odm-panel odm-panel-hq">
+          <div class="odm-panel odm-panel-wis">
             <div class="odm-panel-title">🔵 ${esc(nameA)}</div>
             <div class="odm-panel-scroll">
-              <table><thead><tr>${thHq}</tr></thead><tbody>${buildHqRows(hqBlocks)}</tbody></table>
+              <table><thead><tr>${thA}</tr></thead><tbody>${buildARows(aBlocks)}</tbody></table>
             </div>
           </div>
-          <div class="odm-panel odm-panel-wis">
+          <div class="odm-panel odm-panel-hq">
             <div class="odm-panel-title">🟢 ${esc(nameB)}</div>
             <div class="odm-panel-scroll">
-              <table><thead><tr>${thWis}</tr></thead><tbody>${buildWisRows(wisBlocks)}</tbody></table>
+              <table><thead><tr>${thB}</tr></thead><tbody>${buildBRows(bBlocks)}</tbody></table>
             </div>
           </div>
         </div>
@@ -881,6 +898,21 @@
     const el = document.getElementById('results');
     el.innerHTML = html;
     el.classList.remove('hidden');
+  }
+
+  // ── Read revision info from "Revision" sheet ─────────────────
+  // Returns { ver, date } from the last non-empty row; col 0 = version, col 2 = date
+  function getRevisionInfo(wb) {
+    const ws = wb.Sheets['Revision'] || wb.Sheets['revision'] || wb.Sheets['REVISION'];
+    if (!ws) return null;
+    const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    for (let r = data.length - 1; r >= 0; r--) {
+      const row = data[r] || [];
+      const ver  = String(row[0] ?? '').trim();
+      const date = String(row[2] ?? '').trim();
+      if (ver) return { ver, date };
+    }
+    return null;
   }
 
   // ── startCompare ──────────────────────────────────────────────
@@ -898,6 +930,21 @@
         const data2 = getSheetData(workbooks[2], sheetName);
         const nameA = document.getElementById('customName1')?.value?.trim() || '檔案A';
         const nameB = document.getElementById('customName2')?.value?.trim() || '檔案B';
+
+        // Update revision bar
+        const revA = getRevisionInfo(workbooks[1]);
+        const revB = getRevisionInfo(workbooks[2]);
+        const bar = document.getElementById('revisionBar');
+        if (revA || revB) {
+          const fmtRev = (name, rev, cls) => rev
+            ? `<div class="rev-item"><span class="rev-label ${cls}">${esc(name)}：</span>${esc(rev.ver)}${rev.date ? `（${esc(rev.date)}）` : ''}</div>`
+            : `<div class="rev-item"><span class="rev-label ${cls}">${esc(name)}：</span>—</div>`;
+          bar.innerHTML = fmtRev(nameA, revA, 'rev-a') + `<span style="color:#2d3748">｜</span>` + fmtRev(nameB, revB, 'rev-b');
+          bar.classList.remove('hidden');
+        } else {
+          bar.classList.add('hidden');
+        }
+
         document.getElementById('loadingEl').classList.add('hidden');
         if (isOdmIurSheet(sheetName)) {
           const result = compareOdmIur(data1, data2);
