@@ -281,6 +281,35 @@
 
     input[type="file"] { display: none; }
     .hidden { display: none; }
+
+    /* ── ODM IUR 左右並排面板 ─────────────────────── */
+    .odm-panels { display: flex; gap: 12px; align-items: flex-start; }
+    .odm-panel  { flex: 1; min-width: 0; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,.08); }
+    .odm-panel-title { padding: 10px 16px; font-weight: 700; font-size: .88rem; letter-spacing: .02em; }
+    .odm-panel-hq  .odm-panel-title { background: rgba(59,130,246,.18); color: #60a5fa; border-bottom: 1px solid rgba(59,130,246,.25); }
+    .odm-panel-wis .odm-panel-title { background: rgba(52,211,153,.18); color: #34d399; border-bottom: 1px solid rgba(52,211,153,.25); }
+    .odm-panel-scroll { overflow-y: auto; max-height: 680px; }
+    .odm-panel table { width: 100%; border-collapse: collapse; font-size: .79rem; white-space: nowrap; }
+    .odm-panel thead th {
+      position: sticky; top: 0; z-index: 5;
+      padding: 6px 10px; background: #171c28;
+      border-bottom: 2px solid rgba(255,255,255,.1);
+      color: #64748b; font-size: .74rem; text-align: right;
+      font-family: 'Noto Sans TC', sans-serif; font-weight: 600;
+    }
+    .odm-panel thead th:first-child { text-align: left; min-width: 110px; }
+    .odm-panel tbody td { padding: 5px 10px; border-bottom: 1px solid rgba(255,255,255,.03); text-align: right; color: #94a3b8; font-family: 'JetBrains Mono', monospace; }
+    .odm-panel tbody td:first-child { text-align: left; color: #cbd5e1; font-family: 'Noto Sans TC', sans-serif; }
+    /* Platform group header row */
+    .odm-plat-hdr td { background: rgba(139,92,246,.14) !important; color: #a78bfa !important; font-weight: 700; font-family: 'Noto Sans TC', sans-serif !important; border-top: 2px solid rgba(139,92,246,.25) !important; border-bottom: 1px solid rgba(139,92,246,.15) !important; font-size: .8rem; }
+    /* Subtotal row */
+    .odm-subtotal td { background: rgba(255,255,255,.05) !important; border-top: 1px solid rgba(255,255,255,.1) !important; font-weight: 600; }
+    .odm-panel-hq  .odm-subtotal td { color: #7fb3f5 !important; }
+    .odm-panel-wis .odm-subtotal td { color: #5ecba1 !important; }
+    /* Grand Total row */
+    .odm-grand-total td { background: rgba(251,191,36,.12) !important; border-top: 3px solid rgba(251,191,36,.45) !important; color: #fbbf24 !important; font-weight: 700; font-family: 'Noto Sans TC', sans-serif !important; }
+    /* Alternating data rows */
+    .odm-data-even td { background: rgba(255,255,255,.02); }
   </style>
 </head>
 <body>
@@ -635,28 +664,28 @@
     return name.replace(/-PCB\d+\b/gi, '').replace(/\s+/g, ' ').trim().toLowerCase();
   }
 
-  // ── Parse HQ ODM IUR (platform-aggregate) ────────────────────
+  // ── Parse HQ ODM IUR ─────────────────────────────────────────
   // Platform title: F column (index 5), non-numeric text
-  // Data rows:  B=item name  C=Qty  D=U/P  E=Total Amt
-  // Subtotal:   B/C/D empty, E has number
+  // Data rows:  B=item name  C=Qty  D=U/P  (Sub Amt = C×D)
+  // Subtotal:   B/C/D empty, E has number → Total Amt for the block
   function parseHqOdmIur(data) {
-    const blocks = [];   // { header, key, totalQty, subtotalAmt }
+    const blocks = [];  // { header, key, totalQty, subtotalAmt, items }
     let cur = null;
 
     for (let r = 0; r < data.length; r++) {
-      const row  = data[r] || [];
-      const sB   = String(row[1] ?? '').trim();
-      const sC   = String(row[2] ?? '').trim();
-      const sD   = String(row[3] ?? '').trim();
-      const sE   = String(row[4] ?? '').trim();
-      const sF   = String(row[5] ?? '').trim();
+      const row = data[r] || [];
+      const sB  = String(row[1] ?? '').trim();
+      const sC  = String(row[2] ?? '').trim();
+      const sD  = String(row[3] ?? '').trim();
+      const sE  = String(row[4] ?? '').trim();
+      const sF  = String(row[5] ?? '').trim();
 
       if (!sB && !sC && !sD && !sE && !sF) continue;
 
-      // Platform header row: F has non-empty, non-numeric, non-keyword text
+      // Platform header: F has non-empty, non-numeric, non-keyword text
       if (sF && parseNum(sF) === null &&
           !/^(platform|qty|u\/p|total|sub|odm|free\s*sample|wave)/i.test(sF)) {
-        cur = { header: sF, key: normPlatform(sF), totalQty: 0, subtotalAmt: null };
+        cur = { header: sF, key: normPlatform(sF), totalQty: 0, subtotalAmt: null, items: [] };
         blocks.push(cur);
         continue;
       }
@@ -669,21 +698,24 @@
         if (amt !== null) { cur.subtotalAmt = amt; continue; }
       }
 
-      // Data row: B has item name (not a keyword), C has qty
+      // Data row: B has item name (not a keyword)
       if (sB && !/^(platform.?name|qty|u\/p|total|sub|odm|free\s*sample)/i.test(sB)) {
-        const qty = parseNum(sC);
+        const qty    = parseNum(sC);
+        const up     = parseNum(sD);
+        const subAmt = qty !== null && up !== null ? qty * up : null;
         if (qty !== null) cur.totalQty += qty;
+        cur.items.push({ platform: sB, qty, up, subAmt });
       }
     }
     return blocks;
   }
 
-  // ── Parse Wistron ODM IUR (platform-aggregate) ────────────────
+  // ── Parse Wistron ODM IUR ─────────────────────────────────────
   // Platform title: H column (index 7), non-numeric text
   // Data rows:  B=item  C=Qty WHQ  D=Qty WCQ  E=U/P  F=Sub WHQ  G=Sub WCQ  H=Total Amt
   // Subtotal:   B/C/D/E empty, H has number
   function parseWistronOdmIur(data) {
-    const blocks = [];
+    const blocks = [];  // { header, key, totalQtyWhq, totalQtyWcq, subtotalAmt, items }
     let cur = null;
 
     for (let r = 0; r < data.length; r++) {
@@ -692,14 +724,16 @@
       const sC  = String(row[2] ?? '').trim();
       const sD  = String(row[3] ?? '').trim();
       const sE  = String(row[4] ?? '').trim();
+      const sF  = String(row[5] ?? '').trim();
+      const sG  = String(row[6] ?? '').trim();
       const sH  = String(row[7] ?? '').trim();
 
-      if (!sB && !sC && !sD && !sE && !sH) continue;
+      if (!sB && !sC && !sD && !sE && !sF && !sG && !sH) continue;
 
-      // Platform header row: H has non-empty, non-numeric, non-keyword text
+      // Platform header: H has non-empty, non-numeric, non-keyword text
       if (sH && parseNum(sH) === null &&
           !/^(platform|qty|total|sub|whq|wcq|u\/p|odm|free\s*sample|wave)/i.test(sH)) {
-        cur = { header: sH, key: normPlatform(sH), totalQtyWhq: 0, totalQtyWcq: 0, subtotalAmt: null };
+        cur = { header: sH, key: normPlatform(sH), totalQtyWhq: 0, totalQtyWcq: 0, subtotalAmt: null, items: [] };
         blocks.push(cur);
         continue;
       }
@@ -714,165 +748,99 @@
 
       // Data row: B has item name (not a keyword)
       if (sB && !/^(platform.?name|qty|total|sub|whq|wcq|u\/p|odm|free\s*sample)/i.test(sB)) {
-        cur.totalQtyWhq += parseNum(sC) ?? 0;
-        cur.totalQtyWcq += parseNum(sD) ?? 0;
+        const qtyWhq   = parseNum(sC) ?? 0;
+        const qtyWcq   = parseNum(sD) ?? 0;
+        const up       = parseNum(sE);
+        const subAmtWhq = parseNum(sF) ?? (up !== null ? qtyWhq * up : null);
+        const subAmtWcq = parseNum(sG) ?? (up !== null ? qtyWcq * up : null);
+        const subAmt   = (subAmtWhq ?? 0) + (subAmtWcq ?? 0);
+        cur.totalQtyWhq += qtyWhq;
+        cur.totalQtyWcq += qtyWcq;
+        cur.items.push({ platform: sB, qty: qtyWhq + qtyWcq, qtyWhq, qtyWcq, up, subAmt });
       }
     }
     return blocks;
   }
 
-  // ── Compare ODM IUR (platform aggregate) ─────────────────────
+  // ── Compare ODM IUR ───────────────────────────────────────────
+  // Simply parses both files and returns block lists for side-by-side rendering
   function compareOdmIur(data1, data2) {
-    const hqBlocks  = parseHqOdmIur(data1);
-    const wisBlocks = parseWistronOdmIur(data2);
-
-    // Merge blocks with the same normalized key (e.g. multiple PCB sub-blocks)
-    const mapA = new Map();
-    hqBlocks.forEach(b => {
-      if (mapA.has(b.key)) {
-        const ex = mapA.get(b.key);
-        ex.totalQty   += b.totalQty;
-        ex.subtotalAmt = (ex.subtotalAmt ?? 0) + (b.subtotalAmt ?? 0);
-      } else {
-        mapA.set(b.key, { ...b });
-      }
-    });
-
-    const mapB = new Map();
-    wisBlocks.forEach(b => {
-      if (mapB.has(b.key)) {
-        const ex = mapB.get(b.key);
-        ex.totalQtyWhq += b.totalQtyWhq;
-        ex.totalQtyWcq += b.totalQtyWcq;
-        ex.subtotalAmt  = (ex.subtotalAmt ?? 0) + (b.subtotalAmt ?? 0);
-      } else {
-        mapB.set(b.key, { ...b });
-      }
-    });
-
-    const allKeys = [...mapA.keys()];
-    for (const k of mapB.keys()) if (!mapA.has(k)) allKeys.push(k);
-
-    const rows = [];
-    let grandHqQty = 0, grandWisQty = 0, grandHqAmt = 0, grandWisAmt = 0;
-
-    for (const key of allKeys) {
-      const a = mapA.get(key);
-      const b = mapB.get(key);
-
-      const hqQty  = a ? a.totalQty : null;
-      const wisQty = b ? (b.totalQtyWhq + b.totalQtyWcq) : null;
-      const hqAmt  = a?.subtotalAmt ?? null;
-      const wisAmt = b?.subtotalAmt ?? null;
-
-      const { diff: qtyDiff }            = calcDiff(hqQty,  wisQty);
-      const { diff: amtDiff, pct: amtPct } = calcDiff(hqAmt,  wisAmt);
-
-      let type;
-      if (!a)       type = 'added';
-      else if (!b)  type = 'removed';
-      else          type = [qtyDiff, amtDiff].some(d => d !== null && Math.abs(d) > 1e-9) ? 'changed' : 'same';
-
-      const platformName = a?.header ?? b?.header ?? key;
-      rows.push({ key, platformName, type, hqQty, wisQty, qtyDiff, hqAmt, wisAmt, amtDiff, amtPct });
-
-      grandHqQty  += hqQty  ?? 0;
-      grandWisQty += wisQty ?? 0;
-      grandHqAmt  += hqAmt  ?? 0;
-      grandWisAmt += wisAmt ?? 0;
-    }
-
-    const { diff: grandAmtDiff, pct: grandAmtPct } = calcDiff(grandHqAmt, grandWisAmt);
-    const grandQtyDiff = grandHqQty - grandWisQty;
-
-    return { rows, grandHqQty, grandWisQty, grandQtyDiff, grandHqAmt, grandWisAmt, grandAmtDiff, grandAmtPct };
+    return {
+      hqBlocks:  parseHqOdmIur(data1),
+      wisBlocks: parseWistronOdmIur(data2),
+    };
   }
 
-  // ── Render ODM IUR (platform aggregate) ──────────────────────
+  // ── Render ODM IUR (side-by-side panels) ─────────────────────
   function renderOdmIur(result, sheetName, nameA, nameB) {
-    const { rows, grandHqQty, grandWisQty, grandQtyDiff,
-            grandHqAmt, grandWisAmt, grandAmtDiff, grandAmtPct } = result;
-    const TOTAL_COLS = 8;
+    const { hqBlocks, wisBlocks } = result;
 
-    const changed = rows.filter(r => r.type === 'changed').length;
-    const removed = rows.filter(r => r.type === 'removed').length;
-    const added   = rows.filter(r => r.type === 'added').length;
+    const buildPanel = (blocks) => {
+      if (blocks.length === 0)
+        return `<tr><td colspan="5" class="truncate-notice">（無資料）</td></tr>`;
 
-    const dir = d => d === null ? '' : d > 0 ? ' diff-up' : d < 0 ? ' diff-down' : ' diff-zero';
-    const hi  = v => v ? ' cell-diff' : '';
+      let grandAmt = 0;
+      let rows = '';
+      let evenIdx = 0;
 
-    const th = `
-      <th class="th-item" style="min-width:240px">平台名稱</th>
-      <th class="th-val-a">${esc(nameA)} 數量</th>
-      <th class="th-val-b">${esc(nameB)} 數量<br><span style="font-size:.7rem;opacity:.7">(WHQ+WCQ)</span></th>
-      <th class="th-diff">數量差異</th>
-      <th class="th-val-a">${esc(nameA)} 金額</th>
-      <th class="th-val-b">${esc(nameB)} 金額</th>
-      <th class="th-diff">金額差異(A-B)</th>
-      <th class="th-pct">差異%</th>`;
+      for (const block of blocks) {
+        rows += `<tr class="odm-plat-hdr"><td colspan="5">${esc(block.header)}</td></tr>`;
+        for (const item of block.items) {
+          const evenCls = (evenIdx++ % 2 === 1) ? ' odm-data-even' : '';
+          rows += `<tr class="${evenCls}">
+            <td>${esc(item.platform)}</td>
+            <td>${esc(fmtNumOdm(item.qty))}</td>
+            <td>${esc(fmtNumOdm(item.up))}</td>
+            <td>${esc(fmtNumOdm(item.subAmt))}</td>
+            <td></td>
+          </tr>`;
+        }
+        if (block.subtotalAmt !== null) {
+          grandAmt += block.subtotalAmt;
+          rows += `<tr class="odm-subtotal">
+            <td>小計</td><td></td><td></td><td></td>
+            <td>${esc(fmtNumOdm(block.subtotalAmt))}</td>
+          </tr>`;
+        }
+      }
 
-    let tbody = '';
-    let evenIdx = 0;
+      rows += `<tr class="odm-grand-total">
+        <td>🏁 Grand Total</td><td></td><td></td><td></td>
+        <td>${esc(fmtNumOdm(grandAmt))}</td>
+      </tr>`;
 
-    if (rows.length === 0) {
-      tbody = `<tr><td colspan="${TOTAL_COLS}" class="truncate-notice">（無可比對的 ODM IUR 平台資料）</td></tr>`;
-    } else {
-      rows.forEach(row => {
-        const typeCls = row.type === 'added' ? 'row-added' : row.type === 'removed' ? 'row-removed' : '';
-        const evenCls = (evenIdx++ % 2 === 1) ? ' row-even' : '';
-        const chg = row.type === 'changed';
-        const qH  = chg && row.qtyDiff !== null && Math.abs(row.qtyDiff) > 1e-9;
-        const aH  = chg && row.amtDiff !== null && Math.abs(row.amtDiff) > 1e-9;
-        tbody += `<tr class="${typeCls}${evenCls}" data-type="${row.type}">
-          <td class="td-item" title="${esc(row.platformName)}">${esc(row.platformName)}</td>
-          <td class="td-a${hi(qH)}">${esc(fmtNumOdm(row.hqQty))}</td>
-          <td class="td-b${hi(qH)}">${esc(fmtNumOdm(row.wisQty))}</td>
-          <td class="td-diff${dir(row.qtyDiff)}${hi(qH)}">${esc(fmtDiff(row.qtyDiff))}</td>
-          <td class="td-a${hi(aH)}">${esc(fmtNumOdm(row.hqAmt))}</td>
-          <td class="td-b${hi(aH)}">${esc(fmtNumOdm(row.wisAmt))}</td>
-          <td class="td-diff${dir(row.amtDiff)}${hi(aH)}">${esc(fmtDiff(row.amtDiff))}</td>
-          <td class="td-pct${dir(row.amtDiff)}${hi(aH)}">${esc(fmtPct(row.amtPct))}</td>
-        </tr>`;
-      });
+      return rows;
+    };
 
-      // Grand Total row
-      tbody += `
-        <tr class="row-sep"><td colspan="${TOTAL_COLS}"></td></tr>
-        <tr class="row-final-total" data-type="same">
-          <td class="td-item">🏁 Grand Total</td>
-          <td class="td-a">${esc(fmtNumOdm(grandHqQty))}</td>
-          <td class="td-b">${esc(fmtNumOdm(grandWisQty))}</td>
-          <td class="td-diff${dir(grandQtyDiff)}">${esc(fmtDiff(grandQtyDiff))}</td>
-          <td class="td-a">${esc(fmtNumOdm(grandHqAmt))}</td>
-          <td class="td-b">${esc(fmtNumOdm(grandWisAmt))}</td>
-          <td class="td-diff${dir(grandAmtDiff)}">${esc(fmtDiff(grandAmtDiff))}</td>
-          <td class="td-pct${dir(grandAmtDiff)}">${esc(fmtPct(grandAmtPct))}</td>
-        </tr>`;
-    }
+    const thHq = `<th>Platform</th><th>Qty</th><th>U/P</th><th>Sub Amt</th><th>Total Amt</th>`;
+    const thWis = `<th>Platform</th><th>Qty<br><small>(WHQ+WCQ)</small></th><th>U/P</th><th>Sub Amt</th><th>Total Amt</th>`;
 
     const html = `
       <div class="stats-row">
-        <div class="stat-card"><div class="stat-number">${rows.length}</div><div class="stat-label">平台數</div></div>
-        <div class="stat-card"><div class="stat-number" style="color:#fbbf24">${changed}</div><div class="stat-label">數值變動</div></div>
-        <div class="stat-card"><div class="stat-number" style="color:#f87171">${removed}</div><div class="stat-label">${esc(nameA)} 獨有</div></div>
-        <div class="stat-card"><div class="stat-number" style="color:#34d399">${added}</div><div class="stat-label">${esc(nameB)} 獨有</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:#60a5fa">${hqBlocks.length}</div><div class="stat-label">${esc(nameA)} 平台數</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:#34d399">${wisBlocks.length}</div><div class="stat-label">${esc(nameB)} 平台數</div></div>
       </div>
       <div class="section" style="padding:16px 20px;">
-        <div class="section-title">
-          📋 工作表「${esc(sheetName)}」ODM IUR 平台彙總比對
-          <span class="badge badge-changed">黃＝數值差異</span>
-          <span class="badge badge-removed">紅＝${esc(nameA)}獨有</span>
-          <span class="badge badge-added">綠＝${esc(nameB)}獨有</span>
-        </div>
-        <div class="filter-bar">
-          <button class="toggle-diff-btn" id="toggleDiffBtn" onclick="toggleDiffOnly()">🔍 僅顯示差異</button>
-          <span class="filter-count" id="filterCount"></span>
-        </div>
-        <div class="compare-wrap">
-          <table class="compare-table" id="compareTable">
-            <thead><tr>${th}</tr></thead>
-            <tbody>${tbody}</tbody>
-          </table>
+        <div class="section-title">📋 工作表「${esc(sheetName)}」ODM IUR 資料對照</div>
+        <div class="odm-panels">
+          <div class="odm-panel odm-panel-hq">
+            <div class="odm-panel-title">🔵 ${esc(nameA)}</div>
+            <div class="odm-panel-scroll">
+              <table>
+                <thead><tr>${thHq}</tr></thead>
+                <tbody>${buildPanel(hqBlocks)}</tbody>
+              </table>
+            </div>
+          </div>
+          <div class="odm-panel odm-panel-wis">
+            <div class="odm-panel-title">🟢 ${esc(nameB)}</div>
+            <div class="odm-panel-scroll">
+              <table>
+                <thead><tr>${thWis}</tr></thead>
+                <tbody>${buildPanel(wisBlocks)}</tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>`;
 
