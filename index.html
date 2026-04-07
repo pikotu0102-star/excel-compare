@@ -1047,6 +1047,19 @@
         const nameA = document.getElementById('customName1')?.value?.trim() || '檔案A';
         const nameB = document.getElementById('customName2')?.value?.trim() || '檔案B';
 
+        if (isOdm) {
+          console.log('=== 檔案A 原始資料前15行 ===');
+          for (let i = 0; i < Math.min(15, data1.length); i++) {
+            const r = data1[i] || [];
+            console.log(`行${i}: B=${JSON.stringify(r[1])}, C=${JSON.stringify(r[2])}, D=${JSON.stringify(r[3])}, E=${JSON.stringify(r[4])}, F=${JSON.stringify(r[5])}, G=${JSON.stringify(r[6])}, H=${JSON.stringify(r[7])}`);
+          }
+          console.log('=== 檔案B 原始資料前15行 ===');
+          for (let i = 0; i < Math.min(15, data2.length); i++) {
+            const r = data2[i] || [];
+            console.log(`行${i}: B=${JSON.stringify(r[1])}, C=${JSON.stringify(r[2])}, D=${JSON.stringify(r[3])}, E=${JSON.stringify(r[4])}, F=${JSON.stringify(r[5])}, G=${JSON.stringify(r[6])}, H=${JSON.stringify(r[7])}`);
+          }
+        }
+
         // Update revision bar
         const revA = getRevisionInfo(workbooks[1]);
         const revB = getRevisionInfo(workbooks[2]);
