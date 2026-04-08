@@ -769,7 +769,7 @@
     }
     const grandTotal = (intelAmt ?? 0) + (qcomAmt ?? 0);
     console.log('[HQ] Grand Total = Intel', intelAmt, '+ Qualcomm', qcomAmt, '=', grandTotal);
-    return { blocks, grandTotal };
+    return { blocks, grandTotal, intelAmt, qcomAmt };
   }
 
   // ── Parse Wistron ODM IUR ─────────────────────────────────────
@@ -898,17 +898,31 @@
     const fmtB = detectOdmFormat(data2);
     const resA = fmtA === 'wistron' ? parseWistronOdmIur(data1) : parseHqOdmIur(data1);
     const resB = fmtB === 'wistron' ? parseWistronOdmIur(data2) : parseHqOdmIur(data2);
-    return { aBlocks: resA.blocks, bBlocks: resB.blocks, aGrandTotal: resA.grandTotal, bGrandTotal: resB.grandTotal, fmtA, fmtB };
+    return {
+      aBlocks: resA.blocks, bBlocks: resB.blocks,
+      aGrandTotal: resA.grandTotal, bGrandTotal: resB.grandTotal,
+      aIntelAmt: resA.intelAmt ?? null, aQcomAmt: resA.qcomAmt ?? null,
+      bIntelAmt: resB.intelAmt ?? null, bQcomAmt: resB.qcomAmt ?? null,
+      fmtA, fmtB
+    };
   }
 
   // ── Render ODM IUR (side-by-side panels) ─────────────────────
   // Each panel uses its own detected format (wistron=7cols, hq=4cols)
   function renderOdmIur(result, sheetName, nameA, nameB) {
-    const { aBlocks, bBlocks, fmtA, fmtB, aGrandTotal, bGrandTotal } = result;
-    const NOTE = '* 此總計來自工作表內的彙總行，可能與 NRE Summary 有所不同';
+    const { aBlocks, bBlocks, fmtA, fmtB, aGrandTotal, bGrandTotal, aIntelAmt, aQcomAmt, bIntelAmt, bQcomAmt } = result;
+
+    const makeNote = (fmt, intelAmt, qcomAmt) => {
+      if (fmt === 'hq') {
+        const intel = intelAmt != null ? fmtNumOdm(intelAmt) : '—';
+        const qcom  = qcomAmt  != null ? fmtNumOdm(qcomAmt)  : '—';
+        return `* Grand Total = Intel Total (${intel}) + Qualcomm Total (${qcom}) + PTL 444/484/NVL 484 Scenario\n  如需確認完整金額請參閱 NRE Summary 工作表`;
+      }
+      return `* Grand Total = 各平台 ODM IUR 小計加總\n  如需確認完整金額請參閱 NRE Summary 工作表`;
+    };
 
     // File A (Wistron): Platform | Qty WHQ | Qty WCQ | U/P | Sub Amt WHQ | Sub Amt WCQ | Total Amt
-    const buildARows = (blocks, grandTotal) => {
+    const buildARows = (blocks, grandTotal, note) => {
       if (!blocks.length) return `<tr><td colspan="7" class="truncate-notice">（無資料）</td></tr>`;
       let rows = '', even = 0;
       for (const blk of blocks) {
@@ -937,12 +951,12 @@
         <td>🏁 Grand Total</td><td></td><td></td><td></td><td></td><td></td>
         <td>${esc(fmtNumOdm(grandTotal))}</td>
       </tr>
-      <tr><td colspan="7" style="font-size:.75rem;color:#94a3b8;padding:4px 8px;font-style:italic;">${esc(NOTE)}</td></tr>`;
+      <tr><td colspan="7" style="font-size:.75rem;color:#94a3b8;padding:4px 8px;font-style:italic;white-space:pre-line;">${esc(note)}</td></tr>`;
       return rows;
     };
 
     // File B (HQ): Platform | Qty | U/P | Total Amt
-    const buildBRows = (blocks, grandTotal) => {
+    const buildBRows = (blocks, grandTotal, note) => {
       if (!blocks.length) return `<tr><td colspan="4" class="truncate-notice">（無資料）</td></tr>`;
       let rows = '', even = 0;
       for (const blk of blocks) {
@@ -966,7 +980,7 @@
         <td>🏁 Grand Total</td><td></td><td></td>
         <td>${esc(fmtNumOdm(grandTotal))}</td>
       </tr>
-      <tr><td colspan="4" style="font-size:.75rem;color:#94a3b8;padding:4px 8px;font-style:italic;">${esc(NOTE)}</td></tr>`;
+      <tr><td colspan="4" style="font-size:.75rem;color:#94a3b8;padding:4px 8px;font-style:italic;white-space:pre-line;">${esc(note)}</td></tr>`;
       return rows;
     };
 
@@ -982,18 +996,10 @@
 
     const thA = fmtA === 'wistron' ? thWis : thHq;
     const thB = fmtB === 'wistron' ? thWis : thHq;
-    const rowsA = fmtA === 'wistron' ? buildARows(aBlocks, aGrandTotal) : buildBRows(aBlocks, aGrandTotal);
-    const rowsB = fmtB === 'wistron' ? buildARows(bBlocks, bGrandTotal) : buildBRows(bBlocks, bGrandTotal);
-
-    console.log('[renderOdmIur] fmtA:', fmtA, '/ fmtB:', fmtB);
-
-    const fmtDebugBox = (label, fmt, blocks) => `
-      <div style="background:#1e293b;border:1px solid #334155;border-radius:6px;padding:8px 12px;font-size:11px;color:#94a3b8;font-family:monospace;">
-        <b style="color:#f8fafc">[DEBUG] ${esc(label)}</b><br>
-        格式：<span style="color:${fmt==='wistron'?'#60a5fa':fmt==='hq'?'#34d399':'#f87171'}">${fmt === 'wistron' ? 'Wistron（7欄）' : fmt === 'hq' ? 'HQ（4欄）' : '⚠️ 未偵測到格式'}</span>
-        平台數：<span style="color:#fbbf24">${blocks.length}</span><br>
-        前3平台：${blocks.slice(0,3).map(p=>esc(p.header)).join('、') || '（無）'}
-      </div>`;
+    const noteA = makeNote(fmtA, aIntelAmt, aQcomAmt);
+    const noteB = makeNote(fmtB, bIntelAmt, bQcomAmt);
+    const rowsA = fmtA === 'wistron' ? buildARows(aBlocks, aGrandTotal, noteA) : buildBRows(aBlocks, aGrandTotal, noteA);
+    const rowsB = fmtB === 'wistron' ? buildARows(bBlocks, bGrandTotal, noteB) : buildBRows(bBlocks, bGrandTotal, noteB);
 
     const html = `
       <div class="stats-row">
@@ -1005,14 +1011,12 @@
         <div class="odm-panels">
           <div class="odm-panel odm-panel-wis">
             <div class="odm-panel-title">🔵 ${esc(nameA)}</div>
-            ${fmtDebugBox(nameA, fmtA, aBlocks)}
             <div class="odm-panel-scroll">
               <table><thead><tr>${thA}</tr></thead><tbody>${rowsA}</tbody></table>
             </div>
           </div>
           <div class="odm-panel odm-panel-hq">
             <div class="odm-panel-title">🟢 ${esc(nameB)}</div>
-            ${fmtDebugBox(nameB, fmtB, bBlocks)}
             <div class="odm-panel-scroll">
               <table><thead><tr>${thB}</tr></thead><tbody>${rowsB}</tbody></table>
             </div>
