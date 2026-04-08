@@ -516,14 +516,19 @@
   }
 
   // ── Raw sheet rows (包含空白行，不跳過) ─────────────────────
+  // 強制讀取到至少 startCol+15 欄，確保 HQ Qualcomm (col7-12) 和
+  // Wistron Qualcomm (col9-15) 都能被讀到
   function getRawSheetRows(wb, name) {
     const ws = wb.Sheets[name];
     if (!ws || !ws['!ref']) return [];
     const range = XLSX.utils.decode_range(ws['!ref']);
+    const minEndC = range.s.c + 15;  // 至少讀到起始欄 + 15 欄（共 16 欄）
+    const endC = Math.max(range.e.c, minEndC);
+    console.log(`[getRawSheetRows] 工作表 "${name}" 原始範圍: col${range.s.c}~col${range.e.c}，實際讀取到: col${endC}`);
     const rows = [];
     for (let r = range.s.r; r <= range.e.r; r++) {
       const row = [];
-      for (let c = range.s.c; c <= range.e.c; c++) {
+      for (let c = range.s.c; c <= endC; c++) {
         const cell = ws[XLSX.utils.encode_cell({ r, c })];
         row.push(cell ? cell.v : null);
       }
@@ -726,6 +731,14 @@
       }
     });
     console.log('[HQ診斷] Flip_Marina 出現次數 col11:', flipCounts[11], '| col12:', flipCounts[12], '| col13:', flipCounts[13]);
+
+    // 使用者要求的完整 Qualcomm 掃描 log
+    console.log('=== HQ Qualcomm 平台掃描 ===');
+    data.forEach((row, i) => {
+      if (row[12] && (String(row[12]).includes('Qualcomm') || String(row[12]).includes('Flip'))) {
+        console.log(`行${i} col12=${row[12]}`);
+      }
+    });
 
     // 自動選擇 Qualcomm 標題欄：優先選出現次數最多的欄（預設 col12）
     let qHdrCol = 12;
