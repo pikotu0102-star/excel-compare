@@ -302,8 +302,8 @@
     .odm-panel tbody td:first-child { text-align: left; color: #cbd5e1; font-family: 'Noto Sans TC', sans-serif; }
     /* Platform group header row */
     .odm-plat-hdr td { background: rgba(139,92,246,.14) !important; color: #a78bfa !important; font-weight: 700; font-family: 'Noto Sans TC', sans-serif !important; border-top: 2px solid rgba(139,92,246,.25) !important; border-bottom: 1px solid rgba(139,92,246,.15) !important; font-size: .8rem; }
-    /* Qualcomm platform header row (orange) */
-    .odm-plat-hdr-qcom td { background: rgba(251,146,60,.14) !important; color: #fb923c !important; font-weight: 700; font-family: 'Noto Sans TC', sans-serif !important; border-top: 2px solid rgba(251,146,60,.3) !important; border-bottom: 1px solid rgba(251,146,60,.18) !important; font-size: .8rem; }
+    /* Qualcomm platform header row (dark orange background) */
+    .odm-plat-hdr-qcom td { background: #7c3a00 !important; color: #fed7aa !important; font-weight: 700; font-family: 'Noto Sans TC', sans-serif !important; border-top: 2px solid #c2540a !important; border-bottom: 1px solid #9a4400 !important; font-size: .8rem; }
     /* Chipset section divider */
     .odm-chipset-sep td { height: 6px; padding: 0 !important; border: none !important; background: rgba(255,255,255,.04) !important; }
     /* Subtotal row */
@@ -708,6 +708,33 @@
   function parseHqOdmIur(data) {
     console.log('[HQ] 開始解析，總行數:', data.length);
 
+    // ── 診斷：掃描所有行，找哪個欄位含有 Flip_Marina（Qualcomm 標題用）──
+    const SCAN_COLS = [11, 12, 13];
+    const flipCounts = {};
+    SCAN_COLS.forEach(c => { flipCounts[c] = 0; });
+    data.forEach((row, i) => {
+      SCAN_COLS.forEach(c => {
+        const v = String(row?.[c] ?? '');
+        if (/flip_?marina/i.test(v)) {
+          console.log(`[HQ診斷] Flip_Marina at row[${i}] col${c}=${v}`);
+          flipCounts[c]++;
+        }
+      });
+      // 也記錄使用者指定的 col12
+      if (row?.[12] && String(row[12]).includes('Flip_Marina')) {
+        console.log(`[HQ診斷] Qualcomm 平台行 row[${i}] col12=${row[12]}`);
+      }
+    });
+    console.log('[HQ診斷] Flip_Marina 出現次數 col11:', flipCounts[11], '| col12:', flipCounts[12], '| col13:', flipCounts[13]);
+
+    // 自動選擇 Qualcomm 標題欄：優先選出現次數最多的欄（預設 col12）
+    let qHdrCol = 12;
+    let maxCount = flipCounts[12];
+    for (const c of SCAN_COLS) {
+      if (flipCounts[c] > maxCount) { maxCount = flipCounts[c]; qHdrCol = c; }
+    }
+    console.log('[HQ] 使用 Qualcomm 標題欄: col' + qHdrCol, '(出現', maxCount, '次)');
+
     const intelBlocks = [], qcomBlocks = [];
     const seenIntelKeys = new Set();
     const seenQcomKeys  = new Set();
@@ -716,12 +743,12 @@
 
     for (let r = 0; r < data.length; r++) {
       const row  = data[r] || [];
-      const s0   = String(row[0]  ?? '').trim();  // Intel Platform Name
-      const s2   = String(row[2]  ?? '').trim();  // Intel U/P
-      const s4   = String(row[4]  ?? '').trim();  // Intel Platform Header (F欄)
-      const s7   = String(row[7]  ?? '').trim();  // Qualcomm Platform Name
-      const s9   = String(row[9]  ?? '').trim();  // Qualcomm U/P
-      const s12  = String(row[12] ?? '').trim();  // Qualcomm Platform Header (M欄)
+      const s0   = String(row[0]      ?? '').trim();  // Intel Platform Name
+      const s2   = String(row[2]      ?? '').trim();  // Intel U/P
+      const s4   = String(row[4]      ?? '').trim();  // Intel Platform Header (F欄)
+      const s7   = String(row[7]      ?? '').trim();  // Qualcomm Platform Name
+      const s9   = String(row[9]      ?? '').trim();  // Qualcomm U/P
+      const s12  = String(row[qHdrCol]?? '').trim();  // Qualcomm Platform Header (自動偵測欄)
 
       const isIntelHdr = /flip_?marina/i.test(s4);
       const isQcomHdr  = /flip_?marina/i.test(s12);
