@@ -312,6 +312,8 @@
     .odm-panel-wis .odm-subtotal td { color: #5ecba1 !important; }
     /* Grand Total row */
     .odm-grand-total td { background: rgba(251,191,36,.12) !important; border-top: 3px solid rgba(251,191,36,.45) !important; color: #fbbf24 !important; font-weight: 700; font-family: 'Noto Sans TC', sans-serif !important; }
+    /* Note row below Grand Total */
+    .odm-note-row { font-size: .76rem !important; color: #94a3b8 !important; padding: 6px 10px !important; font-style: italic; white-space: pre-line !important; background: rgba(255,255,255,.02) !important; border-top: 1px solid rgba(255,255,255,.05) !important; font-family: 'Noto Sans TC', sans-serif !important; text-align: left !important; }
     /* Alternating data rows */
     .odm-data-even td { background: rgba(255,255,255,.02); }
 
@@ -1050,7 +1052,7 @@
         <td>🏁 Grand Total</td><td></td><td></td><td></td><td></td><td></td>
         <td>${esc(fmtNumOdm(grandTotal))}</td>
       </tr>
-      <tr><td colspan="7" style="font-size:.75rem;color:#94a3b8;padding:4px 8px;font-style:italic;white-space:pre-line;">${esc(note)}</td></tr>`;
+      <tr><td colspan="7" class="odm-note-row">${esc(note)}</td></tr>`;
       return rows;
     };
 
@@ -1092,7 +1094,7 @@
         <td>🏁 Grand Total</td><td></td><td></td>
         <td>${esc(fmtNumOdm(grandTotal))}</td>
       </tr>
-      <tr><td colspan="4" style="font-size:.75rem;color:#94a3b8;padding:4px 8px;font-style:italic;white-space:pre-line;">${esc(note)}</td></tr>`;
+      <tr><td colspan="4" class="odm-note-row">${esc(note)}</td></tr>`;
       return rows;
     };
 
@@ -1110,6 +1112,8 @@
     const thB = fmtB === 'wistron' ? thWis : thHq;
     const noteA = makeNote(fmtA, aIntelAmt, aQcomAmt);
     const noteB = makeNote(fmtB, bIntelAmt, bQcomAmt);
+    console.log(`[render] ${nameA}(${fmtA}) noteA=`, noteA);
+    console.log(`[render] ${nameB}(${fmtB}) noteB=`, noteB);
     const rowsA = fmtA === 'wistron' ? buildARows(aBlocks, aGrandTotal, noteA) : buildBRows(aBlocks, aGrandTotal, noteA);
     const rowsB = fmtB === 'wistron' ? buildARows(bBlocks, bGrandTotal, noteB) : buildBRows(bBlocks, bGrandTotal, noteB);
 
