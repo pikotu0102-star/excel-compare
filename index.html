@@ -524,7 +524,6 @@
     const range = XLSX.utils.decode_range(ws['!ref']);
     const minEndC = range.s.c + 15;  // 至少讀到起始欄 + 15 欄（共 16 欄）
     const endC = Math.max(range.e.c, minEndC);
-    console.log(`[getRawSheetRows] 工作表 "${name}" 原始範圍: col${range.s.c}~col${range.e.c}，實際讀取到: col${endC}`);
     const rows = [];
     for (let r = range.s.r; r <= range.e.r; r++) {
       const row = [];
@@ -706,125 +705,71 @@
   }
 
   // ── Parse HQ ODM IUR ─────────────────────────────────────────
-  // Intel 區塊：col0=Platform, col1=Qty, col2=U/P, col3=Total, col4=平台標題(含Flip_Marina)
-  // Qualcomm 區塊：col7=Platform, col8=Qty, col9=U/P, col10=Total, col12=平台標題(含Flip_Marina)
-  // 小計行：col3=Intel小計, col10=Qualcomm小計
-  // Grand Total：找 'Total-Intel' 行的 col3 和 'Total-Qualcomm' 行的 col10
+  // Intel  區塊：col0=Platform, col1=Qty, col2=U/P, col3=Total, col4=平台標題(Flip_Marina)
+  // Qualcomm 區塊：col7=Platform, col8=Qty, col9=U/P, col10=Total, col12=平台標題(Flip_Marina)
+  // 小計行：col3=Intel小計 / col10=Qualcomm小計
+  // Grand Total：行66 的 Total-Intel(col3) + Total-Qualcomm(col10) 彙總行
   function parseHqOdmIur(data) {
-    console.log('[HQ] 開始解析，總行數:', data.length);
-
-    // ── 診斷：掃描所有行，找哪個欄位含有 Flip_Marina（Qualcomm 標題用）──
-    const SCAN_COLS = [11, 12, 13];
-    const flipCounts = {};
-    SCAN_COLS.forEach(c => { flipCounts[c] = 0; });
-    data.forEach((row, i) => {
-      SCAN_COLS.forEach(c => {
-        const v = String(row?.[c] ?? '');
-        if (/flip_?marina/i.test(v)) {
-          console.log(`[HQ診斷] Flip_Marina at row[${i}] col${c}=${v}`);
-          flipCounts[c]++;
-        }
-      });
-      // 也記錄使用者指定的 col12
-      if (row?.[12] && String(row[12]).includes('Flip_Marina')) {
-        console.log(`[HQ診斷] Qualcomm 平台行 row[${i}] col12=${row[12]}`);
-      }
-    });
-    console.log('[HQ診斷] Flip_Marina 出現次數 col11:', flipCounts[11], '| col12:', flipCounts[12], '| col13:', flipCounts[13]);
-
-    // 使用者要求的完整 Qualcomm 掃描 log
-    console.log('=== HQ Qualcomm 平台掃描 ===');
-    data.forEach((row, i) => {
-      if (row[12] && (String(row[12]).includes('Qualcomm') || String(row[12]).includes('Flip'))) {
-        console.log(`行${i} col12=${row[12]}`);
-      }
-    });
-
-    // 自動選擇 Qualcomm 標題欄：優先選出現次數最多的欄（預設 col12）
-    let qHdrCol = 12;
-    let maxCount = flipCounts[12];
-    for (const c of SCAN_COLS) {
-      if (flipCounts[c] > maxCount) { maxCount = flipCounts[c]; qHdrCol = c; }
-    }
-    console.log('[HQ] 使用 Qualcomm 標題欄: col' + qHdrCol, '(出現', maxCount, '次)');
-
     const intelBlocks = [], qcomBlocks = [];
-    const seenIntelKeys = new Set();
-    const seenQcomKeys  = new Set();
+    const seenIntelKeys = new Set(), seenQcomKeys = new Set();
     let curIntel = null, curQcom = null;
     const SKIP = /^(platform\s*name|remark:?|odm\s*iur)/i;
 
     for (let r = 0; r < data.length; r++) {
-      const row  = data[r] || [];
-      const s0   = String(row[0]      ?? '').trim();  // Intel Platform Name
-      const s2   = String(row[2]      ?? '').trim();  // Intel U/P
-      const s4   = String(row[4]      ?? '').trim();  // Intel Platform Header (F欄)
-      const s7   = String(row[7]      ?? '').trim();  // Qualcomm Platform Name
-      const s9   = String(row[9]      ?? '').trim();  // Qualcomm U/P
-      const s12  = String(row[qHdrCol]?? '').trim();  // Qualcomm Platform Header (自動偵測欄)
+      const row = data[r] || [];
+      const s0  = String(row[0]  ?? '').trim();  // Intel Platform Name
+      const s2  = String(row[2]  ?? '').trim();  // Intel U/P
+      const s4  = String(row[4]  ?? '').trim();  // Intel 平台標題 (F欄)
+      const s7  = String(row[7]  ?? '').trim();  // Qualcomm Platform Name
+      const s9  = String(row[9]  ?? '').trim();  // Qualcomm U/P
+      const s12 = String(row[12] ?? '').trim();  // Qualcomm 平台標題 (N欄)
 
       const isIntelHdr = /flip_?marina/i.test(s4);
       const isQcomHdr  = /flip_?marina/i.test(s12);
 
-      // Intel platform header
+      // Intel 平台標題
       if (isIntelHdr) {
         const key = normPlatform(s4);
-        if (seenIntelKeys.has(key)) {
-          console.log('[HQ] 跳過重複 Intel 平台 row', r, s4);
-          curIntel = null;
-        } else {
+        if (seenIntelKeys.has(key)) { curIntel = null; }
+        else {
           seenIntelKeys.add(key);
-          console.log('[HQ] Intel 平台 row', r, s4);
           curIntel = { header: s4, key, subtotalAmt: null, items: [], chipset: 'intel' };
           intelBlocks.push(curIntel);
         }
       }
 
-      // Qualcomm platform header
+      // Qualcomm 平台標題
       if (isQcomHdr) {
         const key = normPlatform(s12);
-        if (seenQcomKeys.has(key)) {
-          console.log('[HQ] 跳過重複 Qualcomm 平台 row', r, s12);
-          curQcom = null;
-        } else {
+        if (seenQcomKeys.has(key)) { curQcom = null; }
+        else {
           seenQcomKeys.add(key);
-          console.log('[HQ] Qualcomm 平台 row', r, s12);
           curQcom = { header: s12, key, subtotalAmt: null, items: [], chipset: 'qcom' };
           qcomBlocks.push(curQcom);
         }
       }
 
-      // Intel data row: col0 有值 AND 非skip AND col1 有數值
+      // Intel 資料行
       if (curIntel && !isIntelHdr && s0 && !SKIP.test(s0) && parseNum(row[1]) !== null) {
         curIntel.items.push({ platform: s0, qty: parseNum(row[1]), up: parseNum(s2), totalAmt: parseNum(row[3]) });
       }
-
-      // Intel subtotal: col0 空 AND col3 是數字 AND 非平台標題行
+      // Intel 小計
       if (curIntel && !isIntelHdr && !s0 && typeof row[3] === 'number') {
         curIntel.subtotalAmt = row[3];
-        console.log('[HQ] Intel 小計 row', r, row[3]);
       }
 
-      // Qualcomm data row: col7 有值 AND 非skip AND col8 有數值
+      // Qualcomm 資料行
       const qcQty = parseNum(row[8]);
       if (curQcom && !isQcomHdr && s7 && !SKIP.test(s7) && qcQty !== null) {
         curQcom.items.push({ platform: s7, qty: qcQty, up: parseNum(s9), totalAmt: parseNum(row[10]) });
-        console.log('[HQ] Qualcomm 資料行 row', r, 's7=', s7, 'qty=', qcQty, 'total=', row[10]);
-      } else if (curQcom && !isQcomHdr && s7 && !SKIP.test(s7)) {
-        console.log('[HQ] Qualcomm 資料行 col8 非數字 row', r, 's7=', s7, 'row[8]=', row[8], 'typeof=', typeof row[8]);
       }
-
-      // Qualcomm subtotal: col7 空 AND col10 是數字 AND 非平台標題行
+      // Qualcomm 小計
       if (curQcom && !isQcomHdr && !s7 && typeof row[10] === 'number') {
         curQcom.subtotalAmt = row[10];
-        console.log('[HQ] Qualcomm 小計 row', r, row[10]);
       }
     }
 
-    console.log('[HQ] Intel 平台數:', intelBlocks.length, intelBlocks.map(p => p.header));
-    console.log('[HQ] Qualcomm 平台數:', qcomBlocks.length, qcomBlocks.map(p => p.header));
-
-    // Grand Total：找 'Total-Intel' 和 'Total-Qualcomm' 彙總行
+    // Grand Total：取行66的 Total-Intel(col3) 和 Total-Qualcomm(col10) 彙總值
     let intelAmt = null, qcomAmt = null;
     for (const row of data) {
       const s0 = String(row[0] ?? '').trim();
@@ -832,161 +777,117 @@
       const s7 = String(row[7] ?? '').trim();
       const s8 = String(row[8] ?? '').trim();
       if ((/total.?intel/i.test(s0) || /total.?intel/i.test(s1)) && typeof row[3] === 'number') {
-        intelAmt = row[3];
-        console.log('[HQ] Total-Intel 彙總行, col3=', intelAmt);
+        intelAmt = row[3];  // 取最後一個符合行（即彙總行）
       }
       if ((/total.?qualcomm/i.test(s7) || /total.?qualcomm/i.test(s8)) && typeof row[10] === 'number') {
-        qcomAmt = row[10];
-        console.log('[HQ] Total-Qualcomm 彙總行, col10=', qcomAmt);
+        qcomAmt = row[10];  // 取最後一個符合行（即彙總行）
       }
     }
     const grandTotal = (intelAmt ?? 0) + (qcomAmt ?? 0);
-    console.log('[HQ] Grand Total = Intel', intelAmt, '+ Qualcomm', qcomAmt, '=', grandTotal);
-
-    // blocks = intel blocks 在前，qualcomm blocks 在後
     const blocks = [...intelBlocks, ...qcomBlocks];
     return { blocks, intelBlocks, qcomBlocks, grandTotal, intelAmt, qcomAmt };
   }
 
   // ── Parse Wistron ODM IUR ─────────────────────────────────────
-  // col0=Platform(B)  col1=QtyWHQ(C)  col2=QtyWCQ(D)  col3=U/P(E)
-  // col4=SubWHQ(F)    col5=SubWCQ(G)  col6=Total(H, also PlatHdr)
-  // Platform header: col0 null AND col6 has "Flip_Marina" AND NOT "Total"
-  // Subtotal:        col0 null AND col6 is number
-  // Skip col0 = 'Platform Name' | 'ODM IUR' | 'Free Sample' | 'Free Sample (CPU)' | 'Qty.'
+  // Intel 區塊 (col0-6)：
+  //   col0=Platform, col1=QtyWHQ, col2=QtyWCQ, col3=U/P
+  //   col4=SubWHQ,   col5=SubWCQ, col6=Total / 平台標題(Flip_Marina)
+  //   平台標題：col0 空 AND col6 含 Flip_Marina AND 非 Total
+  //   小計行：col0 空 AND col6 是數字
+  //
+  // Qualcomm 區塊 (col8-15, 行97後)：
+  //   col9=Platform, col10=QtyWHQ, col11=QtyWCQ, col12=U/P
+  //   col13=SubWHQ,  col14=SubWCQ, col15=Total / 平台標題(Flip_Marina)
+  //   平台標題：col15 含 Flip_Marina
+  //   小計行：col9 空 AND col15 是數字
+  //
+  // Grand Total：Intel(col0='ODM IUR' AND col6=number) +
+  //              Qualcomm(col8='ODM IUR' AND col15=number)
   function parseWistronOdmIur(data) {
-    console.log('[Wistron] 開始解析，總行數:', data.length);
     const blocks = [];
     let cur = null;
     const SKIP_0 = /^(free\s*sample(\s*\(cpu\))?|odm\s*iur|platform\s*name|qty\.?)$/i;
 
+    // ── Intel 區塊 ──
     for (let r = 0; r < data.length; r++) {
       const row = data[r] || [];
-      const s0 = String(row[0] ?? '').trim();  // B欄 Platform
-      const s1 = String(row[1] ?? '').trim();  // C欄 Qty WHQ
-      const s2 = String(row[2] ?? '').trim();  // D欄 Qty WCQ
-      const s3 = String(row[3] ?? '').trim();  // E欄 U/P
-      const s4 = String(row[4] ?? '').trim();  // F欄 Sub WHQ
-      const s5 = String(row[5] ?? '').trim();  // G欄 Sub WCQ
-      const s6 = String(row[6] ?? '').trim();  // H欄 Total / Platform header
+      const s0 = String(row[0] ?? '').trim();
+      const s6 = String(row[6] ?? '').trim();
 
-      // Platform header: col0 empty AND col6 has Flip_Marina AND NOT Total
       if (!s0 && /flip_?marina/i.test(s6) && !/total/i.test(s6)) {
-        console.log('[Wistron] 找到平台行 row', r, 'col6=', s6);
         cur = { header: s6, key: normPlatform(s6), subtotalAmtWhq: null, subtotalAmtWcq: null, subtotalAmt: null, items: [] };
         blocks.push(cur);
         continue;
       }
-
       if (!cur) continue;
+      if (s0 && SKIP_0.test(s0)) continue;
 
-      // Skip keyword rows
-      if (s0 && SKIP_0.test(s0)) {
-        console.log('[Wistron] skip row', r, 'col0=', s0);
-        continue;
-      }
-
-      // Subtotal row: col0 empty AND col6 is number
       if (!s0 && typeof row[6] === 'number') {
-        console.log('[Wistron] 小計 row', r, 'col6=', row[6]);
         cur.subtotalAmtWhq = typeof row[4] === 'number' ? row[4] : null;
         cur.subtotalAmtWcq = typeof row[5] === 'number' ? row[5] : null;
         cur.subtotalAmt    = row[6];
         continue;
       }
-
-      // Data row: col0 has value
       if (s0) {
-        console.log('[Wistron] 資料行 row', r, 'col0=', s0, 'col1=', s1, 'col2=', s2, 'col3=', s3, 'col6=', s6);
         cur.items.push({
-          platform:   s0,
-          qtyWhq:     parseNum(s1),
-          qtyWcq:     parseNum(s2),
-          up:         parseNum(s3),
-          subAmtWhq:  parseNum(s4),
-          subAmtWcq:  parseNum(s5),
-          totalAmt:   parseNum(s6),
+          platform:  s0,
+          qtyWhq:    parseNum(row[1]),
+          qtyWcq:    parseNum(row[2]),
+          up:        parseNum(row[3]),
+          subAmtWhq: parseNum(row[4]),
+          subAmtWcq: parseNum(row[5]),
+          totalAmt:  parseNum(row[6]),
         });
       }
     }
-    console.log('[Wistron] Intel 平台數量:', blocks.length);
-    console.log('[Wistron] Intel 平台列表:', blocks.map(p => p.header));
 
-    // ── 診斷：列印行97-115的所有欄位，確認Qualcomm欄位位置 ──
-    console.log('=== Wistron Qualcomm 掃描（行97後）===');
-    data.forEach((row, i) => {
-      if (i >= 97 && i <= 115) {
-        console.log(`Wistron 行${i}:`, (row || []).slice(0, 16));
-      }
-    });
-
-    // ── 第二輪：掃描 Intel 結束後的 Qualcomm 區塊 ──
-    // 結構：col9=Platform Name, col10=Qty WHQ, col11=Qty WCQ
-    // 無明確平台標題行，合併為單一「Qualcomm」區塊
-    const SKIP_9 = /^(platform\s*name|free\s*sample(\s*\(cpu\))?|odm\s*iur|qty\.?)/i;
-    const qcomBlock = { header: 'Qualcomm', key: 'qualcomm', subtotalAmtWhq: null, subtotalAmtWcq: null, subtotalAmt: null, items: [], chipset: 'qcom' };
-    let inQcom = false;
+    // ── Qualcomm 區塊：col15 含 Flip_Marina 為平台標題 ──
+    const SKIP_9 = /^(platform\s*name|free\s*sample(\s*\(cpu\))?|odm\s*iur|whq|qty\.?)/i;
+    let curQ = null;
 
     for (let r = 0; r < data.length; r++) {
       const row = data[r] || [];
-      const s0 = String(row[0] ?? '').trim();
-      const s9 = String(row[9] ?? '').trim();
+      const s9  = String(row[9]  ?? '').trim();
+      const s15 = String(row[15] ?? '').trim();
 
-      // Qualcomm 區塊從第一個 col0='ODM IUR' 且 col9 有值的地方附近開始，
-      // 或直接找 col9 有平台名稱的行（跳過 header/skip 關鍵字）
-      if (!inQcom) {
-        // 用 col9 是非空字串且非數字、非 skip 來判斷進入 Qualcomm 區域
-        if (s9 && !SKIP_9.test(s9) && parseNum(row[9]) === null) {
-          inQcom = true;
-          console.log('[Wistron] 進入 Qualcomm 區域 row', r, 'col9=', s9);
-        }
-      }
-      if (!inQcom) continue;
-      if (SKIP_9.test(s9)) continue;
-
-      // 小計行：col9 空 且 col10 或 col11 或更後面有大數字
-      if (!s9) {
-        const possibleTotal = [row[10], row[11], row[12], row[13], row[14]].find(v => typeof v === 'number' && v > 1000);
-        if (possibleTotal !== undefined) {
-          qcomBlock.subtotalAmtWhq = typeof row[10] === 'number' ? row[10] : null;
-          qcomBlock.subtotalAmtWcq = typeof row[11] === 'number' ? row[11] : null;
-          qcomBlock.subtotalAmt    = typeof row[12] === 'number' ? row[12] : (typeof row[13] === 'number' ? row[13] : possibleTotal);
-          console.log('[Wistron] Qualcomm 小計 row', r, '小計=', qcomBlock.subtotalAmt);
-        }
+      // 平台標題：col15 含 Flip_Marina
+      if (/flip_?marina/i.test(s15)) {
+        curQ = { header: s15, key: normPlatform(s15), subtotalAmtWhq: null, subtotalAmtWcq: null, subtotalAmt: null, items: [], chipset: 'qcom' };
+        blocks.push(curQ);
         continue;
       }
+      if (!curQ) continue;
+      if (s9 && SKIP_9.test(s9)) continue;
 
-      // 資料行：col9 有平台名
-      const qtyWhq = parseNum(row[10]);
-      const qtyWcq = parseNum(row[11]);
-      // U/P、Sub Amt、Total 欄位需從診斷 log 確認後調整
-      const up      = parseNum(row[12]);
-      const subWhq  = parseNum(row[13]);
-      const subWcq  = parseNum(row[14]);
-      const total   = parseNum(row[15]) ?? parseNum(row[14]) ?? parseNum(row[13]);
-      console.log('[Wistron] Qualcomm 資料行 row', r, 'col9=', s9, 'col10=', row[10], 'col11=', row[11], 'col12=', row[12], 'col13=', row[13], 'col14=', row[14], 'col15=', row[15]);
-      qcomBlock.items.push({
-        platform: s9, qtyWhq, qtyWcq, up, subAmtWhq: subWhq, subAmtWcq: subWcq, totalAmt: total,
-      });
+      // 小計行：col9 空 AND col15 是數字
+      if (!s9 && typeof row[15] === 'number') {
+        curQ.subtotalAmtWhq = typeof row[13] === 'number' ? row[13] : null;
+        curQ.subtotalAmtWcq = typeof row[14] === 'number' ? row[14] : null;
+        curQ.subtotalAmt    = row[15];
+        continue;
+      }
+      // 資料行：col9 有值
+      if (s9) {
+        curQ.items.push({
+          platform:  s9,
+          qtyWhq:    parseNum(row[10]),
+          qtyWcq:    parseNum(row[11]),
+          up:        parseNum(row[12]),
+          subAmtWhq: parseNum(row[13]),
+          subAmtWcq: parseNum(row[14]),
+          totalAmt:  parseNum(row[15]),
+        });
+      }
     }
 
-    if (qcomBlock.items.length > 0 || qcomBlock.subtotalAmt !== null) {
-      blocks.push(qcomBlock);
-      console.log('[Wistron] Qualcomm 區塊加入，items=', qcomBlock.items.length);
-    } else {
-      console.log('[Wistron] Qualcomm 區塊無資料，跳過');
-    }
-
-    // Grand Total：加總所有 col0='ODM IUR' 且 col6 是數字的行
+    // Grand Total = Intel ODM IUR col6 + Qualcomm ODM IUR col15
     let grandTotal = 0;
     for (const row of data) {
       const s0 = String(row[0] ?? '').trim();
-      if (/^odm\s*iur$/i.test(s0) && typeof row[6] === 'number') {
-        grandTotal += row[6];
-        console.log('[Wistron] ODM IUR 小計行 col6=', row[6], '累計=', grandTotal);
-      }
+      const s8 = String(row[8] ?? '').trim();
+      if (/^odm\s*iur$/i.test(s0) && typeof row[6]  === 'number') grandTotal += row[6];
+      if (/^odm\s*iur$/i.test(s8) && typeof row[15] === 'number') grandTotal += row[15];
     }
-    console.log('[Wistron] Grand Total =', grandTotal);
     return { blocks, grandTotal };
   }
 
@@ -995,41 +896,17 @@
   // Wistron: any row where col1 (C欄) = 'WHQ'
   // HQ:      any row where col4 (F欄) contains 'Flip_Marina'
   function detectOdmFormat(data) {
-    console.log('[detectOdmFormat] 總行數:', data.length);
-    console.log('[detectOdmFormat] 前10行 col0~col6:');
-    for (let i = 0; i < Math.min(10, data.length); i++) {
-      const row = data[i] || [];
-      console.log(`  row[${i}] col0=${JSON.stringify(row[0])} col1=${JSON.stringify(row[1])} col2=${JSON.stringify(row[2])} col3=${JSON.stringify(row[3])} col4=${JSON.stringify(row[4])} col5=${JSON.stringify(row[5])} col6=${JSON.stringify(row[6])}`);
-    }
-
-    let hasWhq = false, hasFlipInCol4 = false;
-
+    let hasWhq = false, hasFlip = false;
     for (let i = 0; i < data.length; i++) {
       const row = data[i] || [];
-      const s1  = String(row[1]  ?? '').trim();  // C欄
-      const s4  = String(row[4]  ?? '').trim();  // F欄 (Intel platform header)
-      const s12 = String(row[12] ?? '').trim();  // M欄 (Qualcomm platform header)
-      if (/^whq$/i.test(s1)) {
-        hasWhq = true;
-        console.log('[detectOdmFormat] 找到 WHQ at row', i, 'col1=', s1);
-      }
-      if (/flip_?marina/i.test(s4) || /flip_?marina/i.test(s12)) {
-        hasFlipInCol4 = true;
-        console.log('[detectOdmFormat] 找到 Flip_Marina in col4/col12 at row', i, 'col4=', s4, 'col12=', s12);
-      }
+      const s1  = String(row[1]  ?? '').trim();
+      const s4  = String(row[4]  ?? '').trim();
+      const s12 = String(row[12] ?? '').trim();
+      if (/^whq$/i.test(s1)) { hasWhq = true; break; }
+      if (/flip_?marina/i.test(s4) || /flip_?marina/i.test(s12)) hasFlip = true;
     }
-
-    console.log('[detectOdmFormat] hasWhq(col1):', hasWhq, '| hasFlipInCol4/col12:', hasFlipInCol4);
-
-    if (hasWhq) {
-      console.log('[detectOdmFormat] → wistron');
-      return 'wistron';
-    }
-    if (hasFlipInCol4) {
-      console.log('[detectOdmFormat] → hq');
-      return 'hq';
-    }
-    console.warn('[detectOdmFormat] → unknown，無法判斷格式');
+    if (hasWhq)  return 'wistron';
+    if (hasFlip) return 'hq';
     return 'unknown';
   }
 
@@ -1069,7 +946,6 @@
 
     // File A (Wistron): Platform | Qty WHQ | Qty WCQ | U/P | Sub Amt WHQ | Sub Amt WCQ | Total Amt
     const buildARows = (blocks, grandTotal, note) => {
-      console.log('[buildARows] 收到 blocks:', blocks.length, '個 →', blocks.map(b => `${b.header}(${b.chipset||'intel'},items:${b.items?.length??0})`));
       if (!blocks.length) return `<tr><td colspan="7" class="truncate-notice">（無資料）</td></tr>`;
       let rows = '', even = 0, lastChipset = null;
       for (const blk of blocks) {
@@ -1114,7 +990,6 @@
 
     // File B (HQ): Intel 和 Qualcomm 分開顯示，各平台標題顏色不同
     const buildBRows = (blocks, grandTotal, note) => {
-      console.log('[buildBRows] 收到 blocks:', blocks.length, '個 →', blocks.map(b => `${b.header}(${b.chipset||'?'},items:${b.items?.length??0})`));
       if (!blocks.length) return `<tr><td colspan="4" class="truncate-notice">（無資料）</td></tr>`;
       let rows = '', even = 0;
       let lastChipset = null;
