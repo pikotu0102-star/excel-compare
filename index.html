@@ -924,7 +924,7 @@
       }
       // 資料行：Platform 欄有值
       if (s9) {
-        curQ.items.push({
+        const qcItem = {
           platform:  s9,
           qtyWhq:    parseNum(row[qcPlatCol + 1]),
           qtyWcq:    parseNum(row[qcPlatCol + 2]),
@@ -932,7 +932,12 @@
           subAmtWhq: parseNum(row[qcTotalCol - 2]),
           subAmtWcq: parseNum(row[qcTotalCol - 1]),
           totalAmt:  parseNum(row[qcTotalCol]),
-        });
+        };
+        if (/^free\s*sample/i.test(s9)) {
+          console.warn('[Wistron] Qualcomm Free Sample 行未被 SKIP_9 過濾，row' + r + ':', s9, 'totalAmt:', qcItem.totalAmt, '→ 排除');
+        } else {
+          curQ.items.push(qcItem);
+        }
       }
     }
     const qcomBlocksW = blocks.filter(b => b.chipset === 'qcom');
@@ -941,14 +946,28 @@
 
     // Grand Total = 所有 Intel 平台項目加總 + 所有 Qualcomm 平台項目加總
     // 用 items.totalAmt 加總（而非 subtotalAmt），因為 subtotalAmt 來自 Sheet 小計行，含 Free Sample (CPU)
-    // items 已透過 SKIP_0/SKIP_9 排除 Free Sample，故加總不含 Free Sample
+    // items 已透過 SKIP_0/SKIP_9 排除 Free Sample；Qualcomm 資料行額外加 /^free\s*sample/ 二次過濾
+    const FREE_SAMPLE = /^free\s*sample/i;
     const intelBlocks = blocks.filter(b => !b.chipset);
-    const intelGrandTotal  = intelBlocks.reduce((s, b) => s + b.items.reduce((ss, it) => ss + (it.totalAmt ?? 0), 0), 0);
-    const qualcommGrandTotal = qcomBlocksW.reduce((s, b) => s + b.items.reduce((ss, it) => ss + (it.totalAmt ?? 0), 0), 0);
+    console.log('=== Wistron Grand Total 計算明細 ===');
+    const intelGrandTotal = intelBlocks.reduce((s, b) => {
+      const subtotal = b.items
+        .filter(it => !FREE_SAMPLE.test(it.platform ?? ''))
+        .reduce((ss, it) => ss + (it.totalAmt ?? 0), 0);
+      console.log(`加入 Intel 平台小計 [${b.header}]: ${subtotal}`, '(items:', b.items.map(it => it.platform + '=' + it.totalAmt), ')');
+      return s + subtotal;
+    }, 0);
+    const qualcommGrandTotal = qcomBlocksW.reduce((s, b) => {
+      const subtotal = b.items
+        .filter(it => !FREE_SAMPLE.test(it.platform ?? ''))
+        .reduce((ss, it) => ss + (it.totalAmt ?? 0), 0);
+      console.log(`加入 Qualcomm 平台小計 [${b.header}]: ${subtotal}`, '(items:', b.items.map(it => it.platform + '=' + it.totalAmt), ')');
+      return s + subtotal;
+    }, 0);
     const grandTotal = intelGrandTotal + qualcommGrandTotal;
-    console.log('Wistron Intel Grand:', intelGrandTotal);
-    console.log('Wistron Qualcomm Grand:', qualcommGrandTotal);
-    console.log('Wistron Grand Total:', grandTotal);
+    console.log(`Intel Grand Total: ${intelGrandTotal}`);
+    console.log(`Qualcomm Grand Total: ${qualcommGrandTotal}`);
+    console.log(`最終 Grand Total: ${grandTotal}`);
     return { blocks, qualcommPlatforms: qcomBlocksW, grandTotal, intelGrandTotal, qualcommGrandTotal };
   }
 
