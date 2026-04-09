@@ -794,9 +794,9 @@
         }
       }
 
-      // Intel data row: col0 有值 AND 非skip AND col1 是數字
-      if (curIntel && !isIntelHdr && s0 && !SKIP.test(s0) && typeof row[1] === 'number') {
-        curIntel.items.push({ platform: s0, qty: row[1], up: parseNum(s2), totalAmt: parseNum(row[3]) });
+      // Intel data row: col0 有值 AND 非skip AND col1 有數值
+      if (curIntel && !isIntelHdr && s0 && !SKIP.test(s0) && parseNum(row[1]) !== null) {
+        curIntel.items.push({ platform: s0, qty: parseNum(row[1]), up: parseNum(s2), totalAmt: parseNum(row[3]) });
       }
 
       // Intel subtotal: col0 空 AND col3 是數字 AND 非平台標題行
@@ -805,9 +805,13 @@
         console.log('[HQ] Intel 小計 row', r, row[3]);
       }
 
-      // Qualcomm data row: col7 有值 AND 非skip AND col8 是數字
-      if (curQcom && !isQcomHdr && s7 && !SKIP.test(s7) && typeof row[8] === 'number') {
-        curQcom.items.push({ platform: s7, qty: row[8], up: parseNum(s9), totalAmt: parseNum(row[10]) });
+      // Qualcomm data row: col7 有值 AND 非skip AND col8 有數值
+      const qcQty = parseNum(row[8]);
+      if (curQcom && !isQcomHdr && s7 && !SKIP.test(s7) && qcQty !== null) {
+        curQcom.items.push({ platform: s7, qty: qcQty, up: parseNum(s9), totalAmt: parseNum(row[10]) });
+        console.log('[HQ] Qualcomm 資料行 row', r, 's7=', s7, 'qty=', qcQty, 'total=', row[10]);
+      } else if (curQcom && !isQcomHdr && s7 && !SKIP.test(s7)) {
+        console.log('[HQ] Qualcomm 資料行 col8 非數字 row', r, 's7=', s7, 'row[8]=', row[8], 'typeof=', typeof row[8]);
       }
 
       // Qualcomm subtotal: col7 空 AND col10 是數字 AND 非平台標題行
@@ -905,8 +909,73 @@
         });
       }
     }
-    console.log('[Wistron] 找到平台數量:', blocks.length);
-    console.log('[Wistron] 平台列表:', blocks.map(p => p.header));
+    console.log('[Wistron] Intel 平台數量:', blocks.length);
+    console.log('[Wistron] Intel 平台列表:', blocks.map(p => p.header));
+
+    // ── 診斷：列印行97-115的所有欄位，確認Qualcomm欄位位置 ──
+    console.log('=== Wistron Qualcomm 掃描（行97後）===');
+    data.forEach((row, i) => {
+      if (i >= 97 && i <= 115) {
+        console.log(`Wistron 行${i}:`, (row || []).slice(0, 16));
+      }
+    });
+
+    // ── 第二輪：掃描 Intel 結束後的 Qualcomm 區塊 ──
+    // 結構：col9=Platform Name, col10=Qty WHQ, col11=Qty WCQ
+    // 無明確平台標題行，合併為單一「Qualcomm」區塊
+    const SKIP_9 = /^(platform\s*name|free\s*sample(\s*\(cpu\))?|odm\s*iur|qty\.?)/i;
+    const qcomBlock = { header: 'Qualcomm', key: 'qualcomm', subtotalAmtWhq: null, subtotalAmtWcq: null, subtotalAmt: null, items: [], chipset: 'qcom' };
+    let inQcom = false;
+
+    for (let r = 0; r < data.length; r++) {
+      const row = data[r] || [];
+      const s0 = String(row[0] ?? '').trim();
+      const s9 = String(row[9] ?? '').trim();
+
+      // Qualcomm 區塊從第一個 col0='ODM IUR' 且 col9 有值的地方附近開始，
+      // 或直接找 col9 有平台名稱的行（跳過 header/skip 關鍵字）
+      if (!inQcom) {
+        // 用 col9 是非空字串且非數字、非 skip 來判斷進入 Qualcomm 區域
+        if (s9 && !SKIP_9.test(s9) && parseNum(row[9]) === null) {
+          inQcom = true;
+          console.log('[Wistron] 進入 Qualcomm 區域 row', r, 'col9=', s9);
+        }
+      }
+      if (!inQcom) continue;
+      if (SKIP_9.test(s9)) continue;
+
+      // 小計行：col9 空 且 col10 或 col11 或更後面有大數字
+      if (!s9) {
+        const possibleTotal = [row[10], row[11], row[12], row[13], row[14]].find(v => typeof v === 'number' && v > 1000);
+        if (possibleTotal !== undefined) {
+          qcomBlock.subtotalAmtWhq = typeof row[10] === 'number' ? row[10] : null;
+          qcomBlock.subtotalAmtWcq = typeof row[11] === 'number' ? row[11] : null;
+          qcomBlock.subtotalAmt    = typeof row[12] === 'number' ? row[12] : (typeof row[13] === 'number' ? row[13] : possibleTotal);
+          console.log('[Wistron] Qualcomm 小計 row', r, '小計=', qcomBlock.subtotalAmt);
+        }
+        continue;
+      }
+
+      // 資料行：col9 有平台名
+      const qtyWhq = parseNum(row[10]);
+      const qtyWcq = parseNum(row[11]);
+      // U/P、Sub Amt、Total 欄位需從診斷 log 確認後調整
+      const up      = parseNum(row[12]);
+      const subWhq  = parseNum(row[13]);
+      const subWcq  = parseNum(row[14]);
+      const total   = parseNum(row[15]) ?? parseNum(row[14]) ?? parseNum(row[13]);
+      console.log('[Wistron] Qualcomm 資料行 row', r, 'col9=', s9, 'col10=', row[10], 'col11=', row[11], 'col12=', row[12], 'col13=', row[13], 'col14=', row[14], 'col15=', row[15]);
+      qcomBlock.items.push({
+        platform: s9, qtyWhq, qtyWcq, up, subAmtWhq: subWhq, subAmtWcq: subWcq, totalAmt: total,
+      });
+    }
+
+    if (qcomBlock.items.length > 0 || qcomBlock.subtotalAmt !== null) {
+      blocks.push(qcomBlock);
+      console.log('[Wistron] Qualcomm 區塊加入，items=', qcomBlock.items.length);
+    } else {
+      console.log('[Wistron] Qualcomm 區塊無資料，跳過');
+    }
 
     // Grand Total：加總所有 col0='ODM IUR' 且 col6 是數字的行
     let grandTotal = 0;
@@ -1000,10 +1069,21 @@
 
     // File A (Wistron): Platform | Qty WHQ | Qty WCQ | U/P | Sub Amt WHQ | Sub Amt WCQ | Total Amt
     const buildARows = (blocks, grandTotal, note) => {
+      console.log('[buildARows] 收到 blocks:', blocks.length, '個 →', blocks.map(b => `${b.header}(${b.chipset||'intel'},items:${b.items?.length??0})`));
       if (!blocks.length) return `<tr><td colspan="7" class="truncate-notice">（無資料）</td></tr>`;
-      let rows = '', even = 0;
+      let rows = '', even = 0, lastChipset = null;
       for (const blk of blocks) {
-        rows += `<tr class="odm-plat-hdr"><td colspan="7">${esc(blk.header)}</td></tr>`;
+        // chipset 切換時加分隔行
+        if (blk.chipset && blk.chipset !== lastChipset) {
+          if (lastChipset !== null) rows += `<tr class="odm-chipset-sep"><td colspan="7"></td></tr>`;
+          const chipLabel = blk.chipset === 'qcom'
+            ? `<span style="color:#fb923c;font-weight:700;">◈ Qualcomm</span>`
+            : `<span style="color:#a78bfa;font-weight:700;">◈ Intel</span>`;
+          rows += `<tr><td colspan="7" style="padding:6px 12px;font-size:.78rem;background:rgba(255,255,255,.03);">${chipLabel}</td></tr>`;
+          lastChipset = blk.chipset;
+        }
+        const hdrClass = blk.chipset === 'qcom' ? 'odm-plat-hdr-qcom' : 'odm-plat-hdr';
+        rows += `<tr class="${hdrClass}"><td colspan="7">${esc(blk.header)}</td></tr>`;
         for (const it of blk.items) {
           rows += `<tr class="${even++ % 2 ? 'odm-data-even' : ''}">
             <td>${esc(it.platform)}</td>
@@ -1034,6 +1114,7 @@
 
     // File B (HQ): Intel 和 Qualcomm 分開顯示，各平台標題顏色不同
     const buildBRows = (blocks, grandTotal, note) => {
+      console.log('[buildBRows] 收到 blocks:', blocks.length, '個 →', blocks.map(b => `${b.header}(${b.chipset||'?'},items:${b.items?.length??0})`));
       if (!blocks.length) return `<tr><td colspan="4" class="truncate-notice">（無資料）</td></tr>`;
       let rows = '', even = 0;
       let lastChipset = null;
