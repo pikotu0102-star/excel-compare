@@ -935,6 +935,15 @@
             aIntelAmt, aQcomAmt, bIntelAmt, bQcomAmt,
             aIntelBlocks, aQcomBlocks, bIntelBlocks, bQcomBlocks } = result;
 
+    // ── 確認 Qualcomm 平台是否正確載入 ──
+    const aQcomInBlocks = aBlocks.filter(b => b.chipset === 'qcom');
+    const bQcomInBlocks = bBlocks.filter(b => b.chipset === 'qcom');
+    console.log(`renderOdmIur - ${nameA}(${fmtA}) Intel平台數:`, aBlocks.filter(b => b.chipset !== 'qcom').length, '| Qualcomm平台數:', aQcomInBlocks.length);
+    console.log(`renderOdmIur - ${nameB}(${fmtB}) Intel平台數:`, bBlocks.filter(b => b.chipset !== 'qcom').length, '| Qualcomm平台數:', bQcomInBlocks.length);
+    if (aQcomInBlocks.length) console.log(`  ${nameA} Qualcomm平台:`, aQcomInBlocks.map(b => `${b.header}(items:${b.items.length})`));
+    if (bQcomInBlocks.length) console.log(`  ${nameB} Qualcomm平台:`, bQcomInBlocks.map(b => `${b.header}(items:${b.items.length})`));
+    // ── ──
+
     const makeNote = (fmt, intelAmt, qcomAmt) => {
       if (fmt === 'hq') {
         const intel = intelAmt != null ? fmtNumOdm(intelAmt) : '—';
@@ -1052,11 +1061,17 @@
         ${fmtA === 'hq' && aIntelBlocks ? `
           <div class="stat-card"><div class="stat-number" style="color:#a78bfa">${aIntelBlocks.length}</div><div class="stat-label">${esc(nameA)} Intel 平台數</div></div>
           <div class="stat-card"><div class="stat-number" style="color:#fb923c">${aQcomBlocks.length}</div><div class="stat-label">${esc(nameA)} Qualcomm 平台數</div></div>
-        ` : `<div class="stat-card"><div class="stat-number" style="color:#60a5fa">${aBlocks.length}</div><div class="stat-label">${esc(nameA)} 平台數</div></div>`}
+        ` : `
+          <div class="stat-card"><div class="stat-number" style="color:#a78bfa">${aBlocks.filter(b=>b.chipset!=='qcom').length}</div><div class="stat-label">${esc(nameA)} Intel 平台數</div></div>
+          <div class="stat-card"><div class="stat-number" style="color:#fb923c">${aQcomInBlocks.length}</div><div class="stat-label">${esc(nameA)} Qualcomm 平台數</div></div>
+        `}
         ${fmtB === 'hq' && bIntelBlocks ? `
           <div class="stat-card"><div class="stat-number" style="color:#a78bfa">${bIntelBlocks.length}</div><div class="stat-label">${esc(nameB)} Intel 平台數</div></div>
           <div class="stat-card"><div class="stat-number" style="color:#fb923c">${bQcomBlocks.length}</div><div class="stat-label">${esc(nameB)} Qualcomm 平台數</div></div>
-        ` : `<div class="stat-card"><div class="stat-number" style="color:#34d399">${bBlocks.length}</div><div class="stat-label">${esc(nameB)} 平台數</div></div>`}
+        ` : `
+          <div class="stat-card"><div class="stat-number" style="color:#a78bfa">${bBlocks.filter(b=>b.chipset!=='qcom').length}</div><div class="stat-label">${esc(nameB)} Intel 平台數</div></div>
+          <div class="stat-card"><div class="stat-number" style="color:#fb923c">${bQcomInBlocks.length}</div><div class="stat-label">${esc(nameB)} Qualcomm 平台數</div></div>
+        `}
       </div>
       <div class="section" style="padding:16px 20px;">
         <div class="section-title">📋 工作表「${esc(sheetName)}」ODM IUR 資料對照</div>
