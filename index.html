@@ -947,7 +947,7 @@
     console.log('Wistron Intel Grand:', intelGrandTotal);
     console.log('Wistron Qualcomm Grand:', qualcommGrandTotal);
     console.log('Wistron Grand Total:', grandTotal);
-    return { blocks, qualcommPlatforms: qcomBlocksW, grandTotal };
+    return { blocks, qualcommPlatforms: qcomBlocksW, grandTotal, intelGrandTotal, qualcommGrandTotal };
   }
 
   // ── Detect ODM IUR format ─────────────────────────────────────
@@ -979,8 +979,10 @@
     return {
       aBlocks: resA.blocks, bBlocks: resB.blocks,
       aGrandTotal: resA.grandTotal, bGrandTotal: resB.grandTotal,
-      aIntelAmt: resA.intelAmt ?? null, aQcomAmt: resA.qcomAmt ?? null,
-      bIntelAmt: resB.intelAmt ?? null, bQcomAmt: resB.qcomAmt ?? null,
+      aIntelAmt: resA.intelAmt ?? resA.intelGrandTotal ?? null,
+      aQcomAmt:  resA.qcomAmt  ?? resA.qualcommGrandTotal ?? null,
+      bIntelAmt: resB.intelAmt ?? resB.intelGrandTotal ?? null,
+      bQcomAmt:  resB.qcomAmt  ?? resB.qualcommGrandTotal ?? null,
       aIntelBlocks: resA.intelBlocks ?? null, aQcomBlocks: resA.qcomBlocks ?? null,
       bIntelBlocks: resB.intelBlocks ?? null, bQcomBlocks: resB.qcomBlocks ?? null,
       fmtA, fmtB
@@ -1004,12 +1006,12 @@
     // ── ──
 
     const makeNote = (fmt, intelAmt, qcomAmt) => {
+      const intel = intelAmt != null ? fmtNumOdm(intelAmt) : '—';
+      const qcom  = qcomAmt  != null ? fmtNumOdm(qcomAmt)  : '—';
       if (fmt === 'hq') {
-        const intel = intelAmt != null ? fmtNumOdm(intelAmt) : '—';
-        const qcom  = qcomAmt  != null ? fmtNumOdm(qcomAmt)  : '—';
         return `* Grand Total = Intel Total (${intel}) + Qualcomm Total (${qcom}) + PTL 444/484/NVL 484 Scenario\n  如需確認完整金額請參閱 NRE Summary 工作表`;
       }
-      return `* Grand Total = 各平台 ODM IUR 小計加總\n  如需確認完整金額請參閱 NRE Summary 工作表`;
+      return `* Grand Total = Intel 小計 (${intel}) + Qualcomm 小計 (${qcom})\n  如需確認完整金額請參閱 NRE Summary 工作表`;
     };
 
     // File A (Wistron): Platform | Qty WHQ | Qty WCQ | U/P | Sub Amt WHQ | Sub Amt WCQ | Total Amt
