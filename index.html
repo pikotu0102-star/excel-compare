@@ -939,10 +939,12 @@
     console.log('[Wistron] Intel 平台數:', blocks.filter(b => !b.chipset).length, '| Qualcomm 平台數:', qcomBlocksW.length);
     console.log('[Wistron] qualcommPlatforms:', qcomBlocksW.map(b => b.header + '(items:' + b.items.length + ')'));
 
-    // Grand Total = 所有 Intel 平台小計加總 + 所有 Qualcomm 平台小計加總
+    // Grand Total = 所有 Intel 平台項目加總 + 所有 Qualcomm 平台項目加總
+    // 用 items.totalAmt 加總（而非 subtotalAmt），因為 subtotalAmt 來自 Sheet 小計行，含 Free Sample (CPU)
+    // items 已透過 SKIP_0/SKIP_9 排除 Free Sample，故加總不含 Free Sample
     const intelBlocks = blocks.filter(b => !b.chipset);
-    const intelGrandTotal  = intelBlocks.reduce((s, b) => s + (b.subtotalAmt ?? 0), 0);
-    const qualcommGrandTotal = qcomBlocksW.reduce((s, b) => s + (b.subtotalAmt ?? 0), 0);
+    const intelGrandTotal  = intelBlocks.reduce((s, b) => s + b.items.reduce((ss, it) => ss + (it.totalAmt ?? 0), 0), 0);
+    const qualcommGrandTotal = qcomBlocksW.reduce((s, b) => s + b.items.reduce((ss, it) => ss + (it.totalAmt ?? 0), 0), 0);
     const grandTotal = intelGrandTotal + qualcommGrandTotal;
     console.log('Wistron Intel Grand:', intelGrandTotal);
     console.log('Wistron Qualcomm Grand:', qualcommGrandTotal);
