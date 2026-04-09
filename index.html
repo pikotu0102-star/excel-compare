@@ -1296,20 +1296,47 @@
     ).join('');
 
     // Pre-compute adjusted totals for NRE Summary
+    // 最終總計 = Total 行直接讀（Total 已包含 BIOS NRE 等所有項目）
+    // 獨有項目只列出供參考，不再加入計算（避免重複計算）
     let adjData = null;
+    let adjExclusiveNote = '';
     if (isNreSummary) {
       const totalRow = rows.find(r => /^total\b/i.test(r.key.trim()) || /^grand\s+total/i.test(r.key.trim()));
       if (totalRow) {
-        const addedRows  = rows.filter(r => r.type === 'added');
+        const addedRows   = rows.filter(r => r.type === 'added');
         const removedRows = rows.filter(r => r.type === 'removed');
+
+        // console.log 確認 Total 行數值及獨有項目
+        console.log('[NRE] Total 行:', totalRow.key);
+        cols.forEach((col, i) => {
+          console.log(`  col[${i}] "${col}" → A=${totalRow.colData[i]?.vA?.num} B=${totalRow.colData[i]?.vB?.num}`);
+        });
+        if (removedRows.length) {
+          console.log('[NRE] A 獨有項目（已含於 Total，不重複加）:', removedRows.map(r => r.key));
+          removedRows.forEach(r => cols.forEach((col, i) =>
+            console.log(`  A獨有 "${r.key}" col[${i}] → A=${r.colData[i]?.vA?.num}`)));
+        }
+        if (addedRows.length) {
+          console.log('[NRE] B 獨有項目（已含於 Total，不重複加）:', addedRows.map(r => r.key));
+          addedRows.forEach(r => cols.forEach((col, i) =>
+            console.log(`  B獨有 "${r.key}" col[${i}] → B=${r.colData[i]?.vB?.num}`)));
+        }
+
+        // 最終總計 = Total 直接使用，不加獨有項目
         adjData = cols.map((_, i) => {
-          const adjA = (totalRow.colData[i].vA.num ?? 0)
-            + removedRows.reduce((s, r) => s + (r.colData[i].vA.num ?? 0), 0);
-          const adjB = (totalRow.colData[i].vB.num ?? 0)
-            + addedRows.reduce((s, r) => s + (r.colData[i].vB.num ?? 0), 0);
+          const adjA = totalRow.colData[i].vA.num ?? 0;
+          const adjB = totalRow.colData[i].vB.num ?? 0;
           const { diff, pct } = calcDiff(adjA, adjB);
           return { adjA, adjB, diff, pct };
         });
+
+        // 組合獨有項目說明文字
+        const aOnly = removedRows.map(r => r.key).join('、');
+        const bOnly = addedRows.map(r => r.key).join('、');
+        const parts = [];
+        if (aOnly) parts.push(`${nameA} 獨有：${aOnly}`);
+        if (bOnly) parts.push(`${nameB} 獨有：${bOnly}`);
+        if (parts.length) adjExclusiveNote = '＊ ' + parts.join('　') + '\n  （上列獨有項目已含於 Total 行，最終總計直接取 Total）';
       }
     }
 
@@ -1363,12 +1390,16 @@
         `<td class="td-diff${dir(d.diff)}">${esc(fmtDiff(d.diff))}</td>` +
         `<td class="td-pct${dir(d.diff)}">${esc(fmtPct(d.pct))}</td>`
       ).join('');
+      const exclusiveNoteHtml = adjExclusiveNote
+        ? `<tr><td colspan="${totalCols}" style="font-size:.75rem;color:#94a3b8;padding:4px 10px;font-style:italic;white-space:pre-line;background:rgba(255,255,255,.02);">${esc(adjExclusiveNote)}</td></tr>`
+        : '';
       tbodyParts.push(
         `<tr class="row-sep"><td colspan="${totalCols}"></td></tr>`,
         `<tr class="row-final-total" data-type="same">
-          <td class="td-item" title="含所有獨有項目的最終總計">🏁 最終總計<br><span style="font-size:.72rem;font-weight:400;color:#a78bfa">含所有獨有項目</span></td>
+          <td class="td-item" title="Total 行直接讀（已含所有項目）">🏁 最終總計<br><span style="font-size:.72rem;font-weight:400;color:#a78bfa">= Total 行</span></td>
           ${finalCells}
-        </tr>`
+        </tr>`,
+        exclusiveNoteHtml
       );
     }
 
