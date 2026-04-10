@@ -1050,130 +1050,112 @@
   //   4. 垂直堆疊（同一群組多個平台）自然處理
   // ══════════════════════════════════════════════════════════════
   function parseOdmRdPlatforms(data) {
-    const PLAT_KW       = /intel|qualcomm|wcl|ptl|nvl|purwa|flip|marina/i;
+    // Unified parser: works for both HQ and Wistron formats
+    // Key insight from actual Excel analysis:
+    //   HQ:      Two groups side by side per section
+    //            Left  (cols 0-8):  col 0  = "RD resource - WaveN", col 6/7 = Intel platform name
+    //            Right (cols 10-18): col 10 = "RD resource - WaveN", col 16  = Qualcomm platform name
+    //   Wistron: Single or multiple groups stacked vertically
+    //            col 0 empty + col 8 = platform name (Wistron style)
+    //
+    // Algorithm:
+    //   1. Find all "Total cost amount" endCols (col 8, col 18 for HQ; col 8 for Wistron)
+    //   2. For each endCol group (startCol = endCol-8):
+    //      - If row[startCol] has "RD resource -" → HQ Wave header → find platform name
+    //      - If row[startCol] is empty + row[endCol] has platform keyword → Wistron header
+    //   3. Read data rows until "Total amount" row
+
+    const PLAT_KW   = /intel|qualcomm|wcl|ptl|nvl|purwa|flip|marina|mahua|kalambo/i;
     const TOTAL_COST_KW = /total\s*cost\s*amount|total\s*cost/i;
     const JOB_FUNC_KW   = /^job\s*(function|func)/i;
     const TOTAL_AMT_KW  = /^total\s*(amount|amt)/i;
-    const RD_WAVE_KW    = /^rd\s*resource\s*[-\u2013]/i;  // HQ: 'RD resource - Wave1' (has dash)
+    const RD_WAVE_KW    = /^rd\s*resource\s*[-\u2013]/i;
     const EXCLUDE_KW    = /same as intel|same as above|refer to|note:|remark/i;
 
     const platforms = [];
 
-    // Auto-detect HQ style: col 0 has "RD resource - WaveN" as section header
-    let isHqStyle = false;
-    for (let r = 0; r < data.length; r++) {
-      const s0 = String(data[r] && data[r][0] != null ? data[r][0] : '').trim();
-      if (RD_WAVE_KW.test(s0)) { isHqStyle = true; break; }
+    // Step 1: Find all endCols by scanning first 10 rows
+    const endCols = new Set();
+    for (let r = 0; r < Math.min(data.length, 10); r++) {
+      const row = data[r] || [];
+      for (let c = 0; c < row.length; c++) {
+        if (TOTAL_COST_KW.test(String(row[c] != null ? row[c] : '').trim())) endCols.add(c);
+      }
     }
+    if (endCols.size === 0) endCols.add(8);
 
-    if (isHqStyle) {
-      // HQ style: each "RD resource - WaveN" row starts a new platform section
+    // Step 2: For each endCol group, scan all rows
+    for (const endCol of [...endCols].sort((a, b) => a - b)) {
+      const startCol = endCol - 8;
+      if (startCol < 0) continue;
+
+      let currentPlat = null;
+      let inData = false;
+      let fo = { headCounts:1, senior:2, seniorCost:3, junior:4, juniorCost:5, dedication:6, timeLen:7, totalCost:8 };
+
       for (let r = 0; r < data.length; r++) {
         const row = data[r] || [];
-        const s0 = String(row[0] != null ? row[0] : '').trim();
-        if (!RD_WAVE_KW.test(s0)) continue;
+        const s0 = String(row[startCol] != null ? row[startCol] : '').trim();
+        const sE = String(row[endCol]   != null ? row[endCol]   : '').trim();
 
-        // Find platform name in this row (not col 0)
-        let platName = s0;
-        for (let c = 1; c < row.length; c++) {
-          const v = String(row[c] != null ? row[c] : '').trim();
-          if (v && PLAT_KW.test(v) && !EXCLUDE_KW.test(v)) { platName = v; break; }
+        // HQ Wave header: startCol has "RD resource - WaveN"
+        if (RD_WAVE_KW.test(s0)) {
+          if (currentPlat && (currentPlat.rows.length > 0 || currentPlat.totalAmt !== null))
+            platforms.push(currentPlat);
+          // Find platform name: scan ENTIRE row, take LAST match (skips "Same as Intel ID")
+          let platName = null;
+          for (let c = 0; c < row.length; c++) {
+            const v = String(row[c] != null ? row[c] : '').trim();
+            if (v && PLAT_KW.test(v) && !EXCLUDE_KW.test(v)) platName = v;
+          }
+          currentPlat = { name: platName || s0, rows: [], totalAmt: null };
+          inData = false;
+          continue;
         }
 
-        // Field header row = r+1
-        const fhr = r + 1;
-        const fhrRow = data[fhr] || [];
-        let fo = { headCounts:1, senior:2, seniorCost:3, junior:4, juniorCost:5, dedication:6, timeLen:7, totalCost:8 };
-        for (let c = 1; c < fhrRow.length; c++) {
-          const v = String(fhrRow[c] != null ? fhrRow[c] : '').trim().toLowerCase();
-          const off = c;
-          if (/total.*cost|cost.*amount/i.test(v))       fo.totalCost  = off;
-          else if (/head.*count|total.*head/i.test(v))   fo.headCounts = off;
-          else if (/senior.*cost|cost.*senior/i.test(v)) fo.seniorCost = off;
-          else if (/junior.*cost|cost.*junior/i.test(v)) fo.juniorCost = off;
-          else if (/^senior/i.test(v))                   fo.senior     = off;
-          else if (/^junior/i.test(v))                   fo.junior     = off;
-          else if (/dedic/i.test(v))                     fo.dedication = off;
-          else if (/time|month/i.test(v))                fo.timeLen    = off;
+        // Wistron header: startCol empty + endCol has platform name
+        if (!s0 && PLAT_KW.test(sE) && !EXCLUDE_KW.test(sE)) {
+          if (currentPlat && (currentPlat.rows.length > 0 || currentPlat.totalAmt !== null))
+            platforms.push(currentPlat);
+          currentPlat = { name: sE, rows: [], totalAmt: null };
+          inData = false;
+          continue;
         }
 
-        const rows = [];
-        let totalAmt = null;
-        for (let dr = fhr + 1; dr < data.length; dr++) {
-          const drow = data[dr] || [];
-          const jobFunc = String(drow[0] != null ? drow[0] : '').trim();
-          if (!jobFunc) continue;
-          if (RD_WAVE_KW.test(jobFunc)) break;
-          if (JOB_FUNC_KW.test(jobFunc)) continue;
-          if (TOTAL_AMT_KW.test(jobFunc)) {
-            totalAmt = parseNum(drow[fo.totalCost]);
-            break;
-          }
-          rows.push({
-            jobFunc,
-            headCounts: parseNum(drow[fo.headCounts]),
-            senior:     parseNum(drow[fo.senior]),
-            seniorCost: parseNum(drow[fo.seniorCost]),
-            junior:     parseNum(drow[fo.junior]),
-            juniorCost: parseNum(drow[fo.juniorCost]),
-            dedication: parseNum(drow[fo.dedication]),
-            timeLen:    parseNum(drow[fo.timeLen]),
-            totalCost:  parseNum(drow[fo.totalCost]),
-          });
-        }
-        if (rows.length > 0 || totalAmt !== null) platforms.push({ name: platName, rows, totalAmt });
-      }
+        if (!currentPlat) continue;
 
-    } else {
-      // Wistron style: platform name at endCol when startCol is empty
-      const endCols = new Set();
-      for (let r = 0; r < Math.min(data.length, 10); r++) {
-        const row = data[r] || [];
-        for (let c = 0; c < row.length; c++) {
-          if (TOTAL_COST_KW.test(String(row[c] != null ? row[c] : '').trim())) endCols.add(c);
+        // Field header row: detect field offsets
+        if (JOB_FUNC_KW.test(s0)) {
+          fo = { headCounts:1, senior:2, seniorCost:3, junior:4, juniorCost:5, dedication:6, timeLen:7, totalCost:8 };
+          for (let c = startCol + 1; c <= endCol; c++) {
+            const v = String(row[c] != null ? row[c] : '').trim().toLowerCase();
+            const off = c - startCol;
+            if (/total.*cost|cost.*amount/i.test(v))       fo.totalCost  = off;
+            else if (/head.*count|total.*head/i.test(v))   fo.headCounts = off;
+            else if (/senior.*cost|cost.*senior/i.test(v)) fo.seniorCost = off;
+            else if (/junior.*cost|cost.*junior/i.test(v)) fo.juniorCost = off;
+            else if (/^senior/i.test(v))                   fo.senior     = off;
+            else if (/^junior/i.test(v))                   fo.junior     = off;
+            else if (/dedic/i.test(v))                     fo.dedication = off;
+            else if (/time|month/i.test(v) && !/total/i.test(v)) fo.timeLen = off;
+          }
+          inData = true;
+          continue;
         }
-      }
-      if (endCols.size === 0) endCols.add(8);
 
-      for (const endCol of [...endCols].sort((a, b) => a - b)) {
-        const startCol = endCol - 8;
-        if (startCol < 0) continue;
-        let currentPlat = null;
-        let inData = false;
-        let fo = { headCounts:1, senior:2, seniorCost:3, junior:4, juniorCost:5, dedication:6, timeLen:7, totalCost:8 };
-        for (let r = 0; r < data.length; r++) {
-          const row = data[r] || [];
-          const s0 = String(row[startCol] != null ? row[startCol] : '').trim();
-          const sE = String(row[endCol]   != null ? row[endCol]   : '').trim();
-          if (!s0 && PLAT_KW.test(sE) && !EXCLUDE_KW.test(sE)) {
-            if (currentPlat && (currentPlat.rows.length > 0 || currentPlat.totalAmt !== null)) platforms.push(currentPlat);
-            currentPlat = { name: sE, rows: [], totalAmt: null };
-            inData = false; continue;
-          }
-          if (!currentPlat) continue;
-          if (JOB_FUNC_KW.test(s0)) {
-            fo = { headCounts:1, senior:2, seniorCost:3, junior:4, juniorCost:5, dedication:6, timeLen:7, totalCost:8 };
-            for (let c = startCol + 1; c <= endCol; c++) {
-              const v = String(row[c] != null ? row[c] : '').trim().toLowerCase();
-              const off = c - startCol;
-              if (/total.*cost|cost.*amount/i.test(v))       fo.totalCost  = off;
-              else if (/head.*count|total.*head/i.test(v))   fo.headCounts = off;
-              else if (/senior.*cost|cost.*senior/i.test(v)) fo.seniorCost = off;
-              else if (/junior.*cost|cost.*junior/i.test(v)) fo.juniorCost = off;
-              else if (/^senior/i.test(v))                   fo.senior     = off;
-              else if (/^junior/i.test(v))                   fo.junior     = off;
-              else if (/dedic/i.test(v))                     fo.dedication = off;
-              else if (/time|month/i.test(v))                fo.timeLen    = off;
-            }
-            inData = true; continue;
-          }
-          if (!inData) continue;
-          if (TOTAL_AMT_KW.test(s0)) {
-            currentPlat.totalAmt = parseNum(row[startCol + fo.totalCost]);
-            inData = false; continue;
-          }
-          if (s0) currentPlat.rows.push({
-            jobFunc: s0,
+        if (!inData) continue;
+
+        // Total amount row
+        if (TOTAL_AMT_KW.test(s0)) {
+          currentPlat.totalAmt = parseNum(row[startCol + fo.totalCost]);
+          inData = false;
+          continue; // Don't break - vertical stacking may have more platforms
+        }
+
+        // Data row
+        if (s0 && !RD_WAVE_KW.test(s0)) {
+          currentPlat.rows.push({
+            jobFunc:    s0,
             headCounts: parseNum(row[startCol + fo.headCounts]),
             senior:     parseNum(row[startCol + fo.senior]),
             seniorCost: parseNum(row[startCol + fo.seniorCost]),
@@ -1184,8 +1166,10 @@
             totalCost:  parseNum(row[startCol + fo.totalCost]),
           });
         }
-        if (currentPlat && (currentPlat.rows.length > 0 || currentPlat.totalAmt !== null)) platforms.push(currentPlat);
       }
+
+      if (currentPlat && (currentPlat.rows.length > 0 || currentPlat.totalAmt !== null))
+        platforms.push(currentPlat);
     }
 
     return platforms;
