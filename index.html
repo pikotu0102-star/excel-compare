@@ -1288,50 +1288,57 @@
 
     } else {
       // ══ Wistron: platforms are VERTICALLY stacked ══
-      // Structure per block:
-      //   row N  : platform name at col nameCol (last col of the 9-col group)
-      //   row N+1: column headers (Job function, Senior, Junior…)
-      //   row N+2+: data rows
-      //   row ?  : "Total amount" row → marks end of block
-      //
-      // Two horizontal groups may coexist on the same rows:
-      //   Group A (Intel):    cols 0-8,  name at col 8
-      //   Group B (Qualcomm): cols ~9-17, name at col ~17
-      // Both groups are detected by scanning ALL rows.
+      // Platform header row: col0 empty (or "RD resource") AND col8 has platKw
+      //   Group A (Intel):    nameCol = 8,  startCol = 0
+      //   Group B (Qualcomm): nameCol = 9+, startCol = nameCol - 8
+      // From platform header row, scan downward for "Job function" header row.
+      // Data rows follow Job function row until "Total amount".
 
       const seenKeys = new Set();
 
-      for (let r = 0; r < data.length - 1; r++) {
-        const row     = data[r] || [];
-        const nextRow = data[r + 1] || [];
+      for (let r = 0; r < data.length; r++) {
+        const row  = data[r] || [];
+        const col0 = String(row[0] ?? '').trim();
+        const col0Empty     = col0 === '';
+        const isRdResource  = /^rd\s*resource$/i.test(col0);
+        if (!col0Empty && !isRdResource) continue;
 
-        // Scan every column in this row for a platform keyword
-        for (let nameCol = 0; nameCol < row.length; nameCol++) {
-          const v = String(row[nameCol] ?? '').trim();
-          if (!v || !platKw.test(v)) continue;
+        // Collect candidate nameCol positions: col 8 and any cols 9+
+        const candidateCols = [];
+        for (let c = 8; c < row.length; c++) {
+          const v = String(row[c] ?? '').trim();
+          if (v && platKw.test(v)) candidateCols.push(c);
+        }
+        if (candidateCols.length === 0) continue;
 
+        for (const nameCol of candidateCols) {
+          const platName = String(row[nameCol] ?? '').trim();
           const startCol = nameCol - 8;
           if (startCol < 0) continue;
 
-          // Verify: the immediately following row must look like column headers
-          // (at least 2 of: Job function / Senior / Junior / Head count / Dedication / Total)
-          const colHdrKwLocal = /job\s*func|head\s*count|senior|junior|dedic|total/i;
-          const hdrHits = nextRow.slice(startCol, nameCol + 1)
-                                 .filter(c => colHdrKwLocal.test(String(c ?? ''))).length;
-          if (hdrHits < 2) continue;
-
-          // Dedup: skip if we've already parsed this platform name
-          const key = `${v}|${startCol}`;
+          const key = `${platName}|${startCol}`;
           if (seenKeys.has(key)) continue;
           seenKeys.add(key);
 
-          // Build column map from nextRow[startCol..nameCol]
+          // Scan downward (up to 10 rows) for the "Job function" header row
+          let hdrRowData  = null;
+          let hdrRowIdx   = -1;
+          for (let hr = r + 1; hr < Math.min(data.length, r + 10); hr++) {
+            const candidate = data[hr] || [];
+            if (/job\s*func/i.test(String(candidate[startCol] ?? ''))) {
+              hdrRowData = candidate;
+              hdrRowIdx  = hr;
+              break;
+            }
+          }
+          if (!hdrRowData) continue;
+
+          // Build column map from hdrRowData[startCol+1 .. nameCol]
           const cm = { jobFunc: startCol };
           let unitCostCount = 0;
-          for (let c = startCol; c <= nameCol; c++) {
-            const h = String(nextRow[c] ?? '').trim().toLowerCase();
+          for (let c = startCol + 1; c <= nameCol; c++) {
+            const h = String(hdrRowData[c] ?? '').trim().toLowerCase();
             if (!h) continue;
-            if (c === startCol) continue;  // startCol = "Job function" col, already set
             if (!cm.headCounts && /total\s*head|head\s*count/i.test(h))      { cm.headCounts = c; continue; }
             if (!cm.senior    && /senior/i.test(h) && !/cost|unit/i.test(h)) { cm.senior     = c; continue; }
             if (!cm.junior    && /junior/i.test(h) && !/cost|unit/i.test(h)) { cm.junior     = c; continue; }
@@ -1340,9 +1347,9 @@
               if (unitCostCount === 1 && !cm.seniorCost) { cm.seniorCost = c; continue; }
               if (unitCostCount === 2 && !cm.juniorCost) { cm.juniorCost = c; continue; }
             }
-            if (!cm.dedication && /dedic/i.test(h))                         { cm.dedication = c; continue; }
-            if (!cm.timeLen    && /time|length|month/i.test(h))             { cm.timeLen    = c; continue; }
-            if (!cm.totalCost  && /total\s*(cost|amount)/i.test(h))         { cm.totalCost  = c; continue; }
+            if (!cm.dedication && /dedic/i.test(h))                          { cm.dedication = c; continue; }
+            if (!cm.timeLen    && /time|length|month/i.test(h))              { cm.timeLen    = c; continue; }
+            if (!cm.totalCost  && /total\s*(cost|amount)/i.test(h))          { cm.totalCost  = c; continue; }
           }
           // Fallback to fixed offsets
           if (!cm.headCounts) cm.headCounts = startCol + 1;
@@ -1354,10 +1361,10 @@
           if (!cm.timeLen)    cm.timeLen    = startCol + 7;
           if (!cm.totalCost)  cm.totalCost  = nameCol;  // last col of group
 
-          // Read data rows from r+2 until "Total amount" or empty block
+          // Read data rows from hdrRowIdx+1 until "Total amount"
           const rows = [];
           let totalAmt = null;
-          for (let dr = r + 2; dr < data.length; dr++) {
+          for (let dr = hdrRowIdx + 1; dr < data.length; dr++) {
             const drow    = data[dr] || [];
             const jobFunc = String(drow[cm.jobFunc] ?? '').trim();
             if (!jobFunc) continue;
@@ -1376,7 +1383,7 @@
           }
 
           if (rows.length > 0 || totalAmt !== null) {
-            platforms.push({ name: v, rows, totalAmt, _colMap: cm });
+            platforms.push({ name: platName, rows, totalAmt, _colMap: cm });
           }
         }
       }
