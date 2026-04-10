@@ -1202,15 +1202,19 @@
   }
 
   // Detect HQ vs Wistron for RD resource sheet — scan first 15 rows
+  // Wistron: any cell contains "RD resource"
+  // HQ:      any single row has 2+ cells matching platform keywords
   function detectOdmRdFormat(data) {
     const limit = Math.min(data.length, 15);
+    const platKw = /intel|qualcomm|wcl|ptl|nvl|purwa|flip|marina/i;
     for (let r = 0; r < limit; r++) {
       const row = data[r] || [];
       if (row.some(c => /rd\s*resource/i.test(String(c ?? '')))) return 'wistron';
     }
     for (let r = 0; r < limit; r++) {
       const row = data[r] || [];
-      if (row.some(c => /intel\s+wcl|intel\s+ptl|intel\s+nvl|qualcomm/i.test(String(c ?? '')))) return 'hq';
+      const hits = row.filter(c => platKw.test(String(c ?? ''))).length;
+      if (hits >= 2) return 'hq';
     }
     return 'unknown';
   }
@@ -1232,47 +1236,72 @@
   function parseOdmRdPlatforms(data, fmt) {
     const platforms = [];
     const limit15 = Math.min(data.length, 15);
+    const platKw  = /intel|qualcomm|wcl|ptl|nvl|purwa|flip|marina/i;
+    const colHdrKw = /head\s*count|total\s*head|senior|junior|dedication|total\s*(cost|amount)/i;
 
-    // ── Step 1: Find the column-header row (contains "Job function") ──
-    let hdrRowIdx = -1;
-    let jobFuncCols = [];
-    for (let r = 0; r < limit15; r++) {
-      const row = data[r] || [];
-      const cols = [];
-      for (let c = 0; c < row.length; c++) {
-        if (/job\s*func/i.test(String(row[c] ?? ''))) cols.push(c);
+    let platHdrRowIdx = -1;  // row with 2+ platform name cells (HQ only)
+    let hdrRowIdx     = -1;  // row with column labels (Job function / Head counts…)
+    let groupStartCols = []; // columns where each platform group begins
+
+    if (fmt === 'hq') {
+      // ── HQ Step 1: find the platform header row (2+ cells with platform keywords) ──
+      for (let r = 0; r < limit15; r++) {
+        const row = data[r] || [];
+        const platCols = [];
+        for (let c = 0; c < row.length; c++) {
+          if (platKw.test(String(row[c] ?? ''))) platCols.push(c);
+        }
+        if (platCols.length >= 2) { platHdrRowIdx = r; groupStartCols = platCols; break; }
       }
-      if (cols.length > 0) { hdrRowIdx = r; jobFuncCols = cols; break; }
-    }
-    if (hdrRowIdx < 0) return platforms;
+      if (platHdrRowIdx < 0) return platforms;
 
-    // ── Step 2: For each group build a column map from the header row ──
-    const hdrRow = data[hdrRowIdx] || [];
+      // ── HQ Step 2: find the column header row (3+ column label matches) after platHdrRowIdx ──
+      for (let r = platHdrRowIdx + 1; r < Math.min(data.length, platHdrRowIdx + 10); r++) {
+        const row = data[r] || [];
+        if (row.filter(c => colHdrKw.test(String(c ?? ''))).length >= 3) { hdrRowIdx = r; break; }
+      }
+      if (hdrRowIdx < 0) return platforms;
+
+    } else {
+      // ── Wistron: find row with "Job function" label ──
+      for (let r = 0; r < limit15; r++) {
+        const row = data[r] || [];
+        const cols = [];
+        for (let c = 0; c < row.length; c++) {
+          if (/job\s*func/i.test(String(row[c] ?? ''))) cols.push(c);
+        }
+        if (cols.length > 0) { hdrRowIdx = r; groupStartCols = cols; break; }
+      }
+      if (hdrRowIdx < 0) return platforms;
+    }
+
+    const hdrRow      = data[hdrRowIdx] || [];
     const dataStartRow = hdrRowIdx + 1;
 
-    for (let gi = 0; gi < jobFuncCols.length; gi++) {
-      const startCol = jobFuncCols[gi];
-      const nextGroupCol = jobFuncCols[gi + 1] ?? (startCol + 50);
+    // ── For each platform group: build colMap, get platform name, read data rows ──
+    for (let gi = 0; gi < groupStartCols.length; gi++) {
+      const startCol    = groupStartCols[gi];
+      const nextGroupCol = groupStartCols[gi + 1] ?? (startCol + 50);
 
-      // Build column map by scanning header labels within this group
+      // Build column map by scanning header labels
       const cm = { jobFunc: startCol };
       let unitCostCount = 0;
       for (let c = startCol + 1; c < nextGroupCol && c < hdrRow.length; c++) {
         const h = String(hdrRow[c] ?? '').trim().toLowerCase();
         if (!h) continue;
-        if (!cm.headCounts && /total\s*head|head\s*count/i.test(h))   { cm.headCounts = c; continue; }
-        if (!cm.senior    && /senior/i.test(h) && !/cost|unit/i.test(h)) { cm.senior = c; continue; }
-        if (!cm.junior    && /junior/i.test(h) && !/cost|unit/i.test(h)) { cm.junior = c; continue; }
+        if (!cm.headCounts && /total\s*head|head\s*count/i.test(h))      { cm.headCounts = c; continue; }
+        if (!cm.senior    && /senior/i.test(h) && !/cost|unit/i.test(h)) { cm.senior     = c; continue; }
+        if (!cm.junior    && /junior/i.test(h) && !/cost|unit/i.test(h)) { cm.junior     = c; continue; }
         if (/unit\s*cost|unit\s*price/i.test(h)) {
           unitCostCount++;
           if (unitCostCount === 1 && !cm.seniorCost) { cm.seniorCost = c; continue; }
           if (unitCostCount === 2 && !cm.juniorCost) { cm.juniorCost = c; continue; }
         }
-        if (!cm.dedication && /dedic/i.test(h))               { cm.dedication = c; continue; }
-        if (!cm.timeLen    && /time|length|month/i.test(h))   { cm.timeLen    = c; continue; }
-        if (!cm.totalCost  && /total\s*(cost|amount)/i.test(h)) { cm.totalCost = c; continue; }
+        if (!cm.dedication && /dedic/i.test(h))                          { cm.dedication = c; continue; }
+        if (!cm.timeLen    && /time|length|month/i.test(h))              { cm.timeLen    = c; continue; }
+        if (!cm.totalCost  && /total\s*(cost|amount)/i.test(h))          { cm.totalCost  = c; continue; }
       }
-      // Fallback to fixed offsets if detection incomplete
+      // Fallback to fixed offsets
       if (!cm.headCounts) cm.headCounts = startCol + 1;
       if (!cm.senior)     cm.senior     = startCol + 2;
       if (!cm.seniorCost) cm.seniorCost = startCol + 3;
@@ -1282,31 +1311,32 @@
       if (!cm.timeLen)    cm.timeLen    = startCol + 7;
       if (!cm.totalCost)  cm.totalCost  = startCol + 8;
 
-      // ── Step 3: Find platform name in rows above hdrRowIdx ──
+      // Get platform name
       let platName = '';
-      for (let r = 0; r < hdrRowIdx && !platName; r++) {
-        const row = data[r] || [];
-        // Check startCol and the totalCost col (last col of group) for the name
-        for (const c of [startCol, cm.totalCost, startCol + 1]) {
-          const v = String(row[c] ?? '').trim();
-          if (v && /intel|qualcomm|wcl|ptl|nvl|purwa|flip|marina/i.test(v)) {
-            platName = v; break;
+      if (fmt === 'hq') {
+        // Platform name is directly in the platform header row at startCol
+        platName = String(data[platHdrRowIdx]?.[startCol] ?? '').trim();
+      } else {
+        // Wistron: scan rows above hdrRowIdx for a platform keyword near startCol
+        for (let r = 0; r < hdrRowIdx && !platName; r++) {
+          const row = data[r] || [];
+          for (const c of [startCol, cm.totalCost, startCol + 1, startCol - 1]) {
+            if (c < 0) continue;
+            const v = String(row[c] ?? '').trim();
+            if (v && platKw.test(v)) { platName = v; break; }
           }
         }
       }
       if (!platName) continue;
 
-      // ── Step 4: Read data rows ──
+      // Read data rows
       const rows = [];
       let totalAmt = null;
       for (let r = dataStartRow; r < data.length; r++) {
         const row = data[r] || [];
         const jobFunc = String(row[cm.jobFunc] ?? '').trim();
         if (!jobFunc) continue;
-        if (/^total/i.test(jobFunc)) {
-          totalAmt = parseNum(row[cm.totalCost]);
-          break;
-        }
+        if (/^total/i.test(jobFunc)) { totalAmt = parseNum(row[cm.totalCost]); break; }
         rows.push({
           jobFunc,
           headCounts: parseNum(row[cm.headCounts]),
@@ -1320,7 +1350,7 @@
         });
       }
 
-      platforms.push({ name: platName, rows, totalAmt, _colMap: cm });
+      if (rows.length > 0 || totalAmt !== null) platforms.push({ name: platName, rows, totalAmt, _colMap: cm });
     }
 
     return platforms;
