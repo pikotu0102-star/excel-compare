@@ -111,6 +111,7 @@
     .badge-removed { background: rgba(248,113,113,.15); color: #f87171; }
     .badge-changed { background: rgba(251,191,36,.15);  color: #fbbf24; }
     .badge-ai      { background: rgba(139,92,246,.15);  color: #a78bfa; }
+    .badge-warn    { background: rgba(251,146,60,.15);  color: #fb923c; }
 
     /* ── Stats row ────────────────────────────────── */
     .stats-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
@@ -147,7 +148,6 @@
     }
     .compare-table thead tr:nth-child(2) th { border-bottom: 2px solid rgba(255,255,255,.12); }
 
-    /* Sticky fix columns (category + item) */
     .th-cat {
       background: #171c28 !important; color: #64748b !important;
       min-width: 80px; text-align: left;
@@ -159,14 +159,12 @@
       position: sticky !important; left: 0; z-index: 22 !important;
       border-right: 2px solid rgba(255,255,255,.1);
     }
-    /* Value column group header */
     .th-valcol {
       background: rgba(30,40,70,.95) !important;
       color: #a78bfa !important; text-align: center;
       border-left: 2px solid rgba(139,92,246,.25);
       font-size: .78rem;
     }
-    /* Sub-headers */
     .th-val-a  { background: rgba(12,32,62,.92) !important;  color: #7fb3f5 !important; text-align: right; min-width: 90px; }
     .th-val-b  { background: rgba(8,38,28,.92)  !important;  color: #5ecba1 !important; text-align: right; min-width: 90px; }
     .th-diff   { background: rgba(40,30,10,.92)  !important; color: #fbbf24 !important; text-align: right; min-width: 90px; }
@@ -198,7 +196,6 @@
     .td-text-a { background: rgba(12,32,62,.18); white-space: normal; word-break: break-word; max-width: 200px; }
     .td-text-b { background: rgba(8,38,28,.18);  white-space: normal; word-break: break-word; max-width: 200px; }
 
-    /* Row-level highlights */
     .row-added   .td-cat, .row-added   .td-item { background: rgba(52,211,153,.15) !important; }
     .row-added   .td-a   { background: rgba(52,211,153,.04) !important; color: #334155; }
     .row-added   .td-b   { background: rgba(52,211,153,.18) !important; color: #34d399; }
@@ -210,15 +207,12 @@
     .row-removed .td-text-a { background: rgba(248,113,113,.18) !important; color: #f87171; }
     .row-removed .td-text-b { background: rgba(248,113,113,.04) !important; color: #334155; }
 
-    /* Cell-level diff — high specificity to beat .row-even overrides */
     .compare-table tbody tr td.cell-diff { background: rgba(251,191,36,.28) !important; }
 
-    /* Diff direction colors (positive=green, negative=red) */
     .diff-up   { color: #34d399 !important; }
     .diff-down { color: #f87171 !important; }
     .diff-zero { color: #475569 !important; }
 
-    /* ── Alternating rows ─────────────────────────── */
     .row-even .td-item   { background: #1c2235 !important; }
     .row-even .td-a      { background: rgba(12,32,62,.28) !important; }
     .row-even .td-b      { background: rgba(8,38,28,.28) !important; }
@@ -227,11 +221,9 @@
     .row-even .td-text-a { background: rgba(12,32,62,.28) !important; }
     .row-even .td-text-b { background: rgba(8,38,28,.28) !important; }
 
-    /* ── Total rows ───────────────────────────────── */
     .row-total .td-item { font-weight: 700 !important; color: #f8fafc !important; font-size: .85rem; }
     .row-total td       { border-top: 2px solid rgba(255,255,255,.18) !important; }
 
-    /* ── 最終總計 row ────────────────────────────── */
     .row-final-total td        { background: rgba(251,191,36,.12) !important; border-top: 3px solid rgba(251,191,36,.55) !important; }
     .row-final-total .td-item  { font-weight: 700 !important; color: #fbbf24 !important; font-size: .9rem !important; background: rgba(251,191,36,.22) !important; letter-spacing: .01em; }
     .row-final-total .td-a     { font-weight: 700 !important; font-size: .83rem !important; }
@@ -239,10 +231,8 @@
     .row-final-total .td-diff  { font-weight: 700 !important; font-size: .83rem !important; }
     .row-final-total .td-pct   { font-weight: 700 !important; }
 
-    /* ── Block separator row ──────────────────────── */
     .row-sep td { height: 4px; padding: 0 !important; border: none !important; background: rgba(255,255,255,.05) !important; }
 
-    /* ── ODM IUR product section header ──────────── */
     .odm-product-hdr td {
       padding: 8px 14px !important; font-weight: 700; color: #a78bfa;
       background: rgba(139,92,246,.12) !important;
@@ -250,7 +240,6 @@
       border-bottom: 1px solid rgba(139,92,246,.2) !important;
     }
 
-    /* ── Filter toggle button ─────────────────────── */
     .filter-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
     .toggle-diff-btn {
       padding: 5px 16px; border-radius: 20px; font-size: .8rem; font-weight: 600;
@@ -262,7 +251,6 @@
     .toggle-diff-btn:hover  { background: rgba(251,191,36,.16); }
     .filter-count { font-size: .77rem; color: #64748b; }
 
-    /* Truncation notice */
     .truncate-notice {
       text-align: center; padding: 12px; color: #64748b; font-size: .78rem;
       background: rgba(255,255,255,.02);
@@ -300,43 +288,17 @@
     .odm-panel thead th:first-child { text-align: left; min-width: 110px; }
     .odm-panel tbody td { padding: 5px 10px; border-bottom: 1px solid rgba(255,255,255,.03); text-align: right; color: #94a3b8; font-family: 'JetBrains Mono', monospace; }
     .odm-panel tbody td:first-child { text-align: left; color: #cbd5e1; font-family: 'Noto Sans TC', sans-serif; }
-    /* Platform group header row */
     .odm-plat-hdr td { background: rgba(139,92,246,.14) !important; color: #a78bfa !important; font-weight: 700; font-family: 'Noto Sans TC', sans-serif !important; border-top: 2px solid rgba(139,92,246,.25) !important; border-bottom: 1px solid rgba(139,92,246,.15) !important; font-size: .8rem; }
-    /* Qualcomm platform header row (dark orange background) */
     .odm-plat-hdr-qcom td { background: #7c3a00 !important; color: #fed7aa !important; font-weight: 700; font-family: 'Noto Sans TC', sans-serif !important; border-top: 2px solid #c2540a !important; border-bottom: 1px solid #9a4400 !important; font-size: .8rem; }
-    /* Chipset section divider */
     .odm-chipset-sep td { height: 6px; padding: 0 !important; border: none !important; background: rgba(255,255,255,.04) !important; }
-    /* Subtotal row */
     .odm-subtotal td { background: rgba(255,255,255,.05) !important; border-top: 1px solid rgba(255,255,255,.1) !important; font-weight: 600; }
     .odm-panel-hq  .odm-subtotal td { color: #7fb3f5 !important; }
     .odm-panel-wis .odm-subtotal td { color: #5ecba1 !important; }
-    /* Grand Total row */
     .odm-grand-total td { background: rgba(251,191,36,.12) !important; border-top: 3px solid rgba(251,191,36,.45) !important; color: #fbbf24 !important; font-weight: 700; font-family: 'Noto Sans TC', sans-serif !important; }
-    /* Note row below Grand Total */
     .odm-note-row { font-size: .76rem !important; color: #94a3b8 !important; padding: 6px 10px !important; font-style: italic; white-space: pre-line !important; background: rgba(255,255,255,.02) !important; border-top: 1px solid rgba(255,255,255,.05) !important; font-family: 'Noto Sans TC', sans-serif !important; text-align: left !important; }
-    /* Alternating data rows */
     .odm-data-even td { background: rgba(255,255,255,.02); }
 
-    /* ── ODM RD Resource 比對 ────────────────────────────────── */
-    .rd-warning {
-      background: rgba(251,146,60,.1); border: 1px solid rgba(251,146,60,.3);
-      color: #fb923c; border-radius: 8px; padding: 10px 16px;
-      margin: 12px 20px; font-size: .84rem;
-    }
-    .rd-tab-bar { display:flex; gap:2px; padding:12px 20px 0; border-bottom:1px solid rgba(255,255,255,.07); }
-    .rd-tab {
-      padding: 6px 18px; border-radius: 8px 8px 0 0; cursor: pointer;
-      font-size: .82rem; border: 1px solid transparent; border-bottom: none;
-      color: #64748b; background: transparent; transition: all .15s;
-    }
-    .rd-tab:hover { color: #94a3b8; }
-    .rd-tab.active { color: #e2e8f0; background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.1); }
-    .rd-tab-content { display:none; }
-    .rd-tab-content.active { display:block; }
-    .rd-raw-table { width:100%; border-collapse:collapse; font-size:.74rem; font-family:'JetBrains Mono',monospace; }
-    .rd-raw-table th { background:rgba(255,255,255,.05); color:#64748b; padding:4px 8px; border:1px solid rgba(255,255,255,.06); text-align:center; white-space:nowrap; }
-    .rd-raw-table td { padding:3px 8px; border:1px solid rgba(255,255,255,.05); color:#94a3b8; white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis; }
-    .rd-raw-table tr:nth-child(even) td { background:rgba(255,255,255,.02); }
+    /* ── ODM RD Resource ────────────────────────────────── */
     .rd-selector {
       display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end;
       padding: 16px 20px; background: rgba(255,255,255,.02);
@@ -377,6 +339,33 @@
     }
     .rd-only-a td { color: #60a5fa; font-style: italic; }
     .rd-only-b td { color: #34d399; font-style: italic; }
+
+    /* ── RD Raw view ── */
+    .rd-raw-wrap { overflow: auto; max-height: 520px; padding: 12px 16px; }
+    .rd-raw-table { border-collapse: collapse; font-size: .75rem; white-space: nowrap; }
+    .rd-raw-table th { background: rgba(255,255,255,.08); color: #64748b; padding: 4px 8px; border: 1px solid rgba(255,255,255,.06); font-family: 'JetBrains Mono',monospace; }
+    .rd-raw-table td { padding: 3px 8px; border: 1px solid rgba(255,255,255,.04); color: #94a3b8; font-family: 'JetBrains Mono',monospace; }
+    .rd-raw-table td.has-val { color: #e2e8f0; }
+    .rd-raw-table td.is-kw   { color: #a78bfa; font-weight: 700; }
+
+    /* ── Debug notice box ── */
+    .debug-box {
+      background: rgba(251,146,60,.08); border: 1px solid rgba(251,146,60,.25);
+      border-radius: 10px; padding: 14px 18px; margin: 12px 0;
+      font-size: .82rem; color: #fb923c; font-family: 'JetBrains Mono', monospace;
+      white-space: pre-wrap; line-height: 1.7;
+    }
+
+    /* ── RD view mode tabs ── */
+    .rd-view-tabs { display: flex; gap: 8px; padding: 12px 20px; background: rgba(0,0,0,.15); border-bottom: 1px solid rgba(255,255,255,.06); }
+    .rd-tab-btn {
+      padding: 5px 18px; border-radius: 20px; font-size: .8rem; font-weight: 600;
+      border: 1px solid rgba(255,255,255,.15); color: #64748b;
+      background: transparent; cursor: pointer; transition: all .2s;
+      font-family: 'Noto Sans TC', sans-serif;
+    }
+    .rd-tab-btn.active { background: rgba(139,92,246,.2); border-color: #a78bfa; color: #a78bfa; }
+    .rd-tab-btn:hover:not(.active) { border-color: rgba(255,255,255,.25); color: #94a3b8; }
 
     /* ── 版本資訊列 ──────────────────────────────── */
     .revision-bar {
@@ -495,53 +484,29 @@
     if (!workbooks[1] || !workbooks[2]) return;
     const s1 = workbooks[1].SheetNames;
     const s2 = workbooks[2].SheetNames;
-    const nameA = document.getElementById('customName1')?.value?.trim() || '檔案A';
-    const nameB = document.getElementById('customName2')?.value?.trim() || '檔案B';
-
-    // Case-insensitive matching
-    const s2lower = s2.map(s => s.trim().toLowerCase());
-    const s1lower = s1.map(s => s.trim().toLowerCase());
-
-    const common = s1.filter(s => s2lower.includes(s.trim().toLowerCase()));
-    const aOnly  = s1.filter(s => !s2lower.includes(s.trim().toLowerCase()));
-    const bOnly  = s2.filter(s => !s1lower.includes(s.trim().toLowerCase()));
-
-    // Build sheetNameMap { dropdownKey(=s1Name): { wb1: actualS1Name, wb2: actualS2Name } }
-    const sheetNameMap = {};
-    for (const n1 of common) {
-      const n2 = s2[s2lower.indexOf(n1.trim().toLowerCase())];
-      sheetNameMap[n1] = { wb1: n1, wb2: n2 };
-    }
-    window._sheetNameMap = sheetNameMap;
-
-    const s2Common = common.map(n => sheetNameMap[n].wb2);
+    const common = s1.filter(s => s2.includes(s));
+    const aOnly  = s1.filter(s => !s2.includes(s));
+    const bOnly  = s2.filter(s => !s1.includes(s));
 
     const chips = (arr, cls) => arr.map(s => `<span class="sheet-chip ${cls}">${esc(s)}</span>`).join('');
     document.getElementById('sheetSummaryInner').innerHTML = `
       <div class="sheet-group">
         <span class="sheet-group-label">📁 檔案 A（${s1.length} 個工作表）</span>
-        ${chips(common, 'chip-common')}
+        ${chips(s1.filter(s => common.includes(s)), 'chip-common')}
         ${chips(aOnly, 'chip-a-only')}
       </div>
       <div class="sheet-group">
-        <span class="sheet-group-label">📁 檔案 B（${s2.length} 個工作表）</span>
-        ${chips(s2Common, 'chip-common')}
+        <span class="sheet-group-label">📁 檔案 B（s2.length} 個工作表）</span>
+        ${chips(s2.filter(s => common.includes(s)), 'chip-common')}
         ${chips(bOnly, 'chip-b-only')}
       </div>
-      ${aOnly.length > 0 ? `<div class="sheet-note sheet-note-red">⚠️ 僅 ${esc(nameA)} 有：${aOnly.map(esc).join('、')}</div>` : ''}
-      ${bOnly.length > 0 ? `<div class="sheet-note sheet-note-green">✅ 僅 ${esc(nameB)} 有：${bOnly.map(esc).join('、')}</div>` : ''}
-      ${common.length === 0
-        ? '<div class="sheet-note sheet-note-red">❌ 兩個檔案沒有共同工作表，無法比對</div>'
-        : `<div class="sheet-note" style="color:#a78bfa;background:rgba(139,92,246,.1)">✔ 共同工作表：${common.length} 個</div>`}
+      ${aOnly.length > 0 ? `<div class="sheet-note sheet-note-red">⚠️ 僅 ${esc(document.getElementById('customName1')?.value?.trim()||'檔案A')} 有：${aOnly.map(esc).join('、')}</div>` : ''}
+      ${bOnly.length > 0 ? `<div class="sheet-note sheet-note-green">✅ 僅 ${esc(document.getElementById('customName2')?.value?.trim()||'檔案B')} 有：${bOnly.map(esc).join('、')}</div>` : ''}
+      ${common.length === 0 ? '<div class="sheet-note sheet-note-red">❌ 兩個檔案沒有共同工作表，無法比對</div>' : `<div class="sheet-note" style="color:#a78bfa;background:rgba(139,92,246,.1)">✔ 共同工作表：${common.length} 個</div>`}
     `;
     document.getElementById('sheetSummaryEl').classList.remove('hidden');
     const sel = document.getElementById('sheetSelect');
-    // Dropdown value = s1 name; label shows s2 name if different
-    sel.innerHTML = common.map(n => {
-      const n2 = sheetNameMap[n].wb2;
-      const label = n === n2 ? n : `${n}  (B: ${n2})`;
-      return `<option value="${esc(n)}">${esc(label)}</option>`;
-    }).join('');
+    sel.innerHTML = common.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
     document.getElementById('sheetSelectorEl').classList.toggle('hidden', common.length === 0);
     document.getElementById('compareBtn').disabled = common.length === 0;
   }
@@ -557,7 +522,6 @@
     return isNaN(n) ? null : n;
   }
 
-  // Excel date serial → YYYY/MM/DD (serials 40000-60000 = years ~2009-2064)
   function isExcelDate(n) {
     return typeof n === 'number' && Number.isInteger(n) && n > 40000 && n < 60000;
   }
@@ -572,12 +536,11 @@
   function fmtNum(v) {
     if (v === null || v === undefined || v === '') return '';
     const n = parseNum(v);
-    if (n === null || n === undefined || typeof n !== 'number') return String(v); // caller handles esc()
+    if (n === null || n === undefined || typeof n !== 'number') return String(v);
     if (isExcelDate(n)) return fmtExcelDate(n);
     return n.toLocaleString('zh-TW', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   }
 
-  // ODM IUR 專用：強制當作數字，不套用日期格式
   function fmtNumOdm(v) {
     if (v === null || v === undefined || v === '') return '';
     const n = typeof v === 'number' ? v : parseNum(String(v));
@@ -602,13 +565,12 @@
     return XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
   }
 
-  // ── Raw sheet rows (包含空白行，不跳過) ─────────────────────
-  // 讀取工作表全部欄位（不設上限），以完整涵蓋 RD resource 多平台橫向佈局
   function getRawSheetRows(wb, name) {
     const ws = wb.Sheets[name];
     if (!ws || !ws['!ref']) return [];
     const range = XLSX.utils.decode_range(ws['!ref']);
-    const endC = range.e.c;
+    const minEndC = range.s.c + 15;
+    const endC = Math.max(range.e.c, minEndC);
     const rows = [];
     for (let r = range.s.r; r <= range.e.r; r++) {
       const row = [];
@@ -621,19 +583,30 @@
     return rows;
   }
 
-  // Item key column (Excel col B = index 1)
+  // ── Get extended raw rows (wider scan for RD resource) ────────
+  function getWideRawSheetRows(wb, name) {
+    const ws = wb.Sheets[name];
+    if (!ws || !ws['!ref']) return [];
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const rows = [];
+    for (let r = range.s.r; r <= range.e.r; r++) {
+      const row = [];
+      for (let c = range.s.c; c <= range.e.c; c++) {
+        const cell = ws[XLSX.utils.encode_cell({ r, c })];
+        row.push(cell ? cell.v : null);
+      }
+      rows.push(row);
+    }
+    return rows;
+  }
+
   const ITEM_IDX = 1;
 
-  // ── Find header row ───────────────────────────────────────────
-  // Prefer the first row where ITEM_IDX contains a header keyword.
-  // Fallback: first row where ITEM_IDX has any text AND another column also has text.
   function findHeaderRow(data) {
-    // Strong match: col B has an explicit "Item"-like label
     for (let r = 0; r < Math.min(data.length, 10); r++) {
       const item = String(data[r]?.[ITEM_IDX] ?? '').trim();
       if (/^(item|description|品名|項目|name)$/i.test(item)) return r;
     }
-    // Weak match: col B has any text AND at least one other column has text
     for (let r = 0; r < Math.min(data.length, 10); r++) {
       const row  = data[r] || [];
       const item = String(row[ITEM_IDX] ?? '').trim();
@@ -644,21 +617,16 @@
     return 0;
   }
 
-  // ── Discover value columns from header row ────────────────────
-  // Returns columns (other than ITEM_IDX) that have a header label AND
-  // at least one non-empty data cell in the rows below.
-  // Header labels that should never be treated as value columns
   const SKIP_COL_LABELS = /^(item|description|品名|項目|name|no\.?|#|序號|備註|remark)$/i;
 
   function discoverCols(data, hdrRow) {
     const hdr = data[hdrRow] || [];
     const result = [];
     for (let c = 0; c < hdr.length; c++) {
-      if (c === 0 || c === ITEM_IDX) continue; // skip col A (often row-numbers) and item col
+      if (c === 0 || c === ITEM_IDX) continue;
       const label = String(hdr[c] ?? '').trim();
       if (!label) continue;
-      if (SKIP_COL_LABELS.test(label)) continue; // skip item-like header labels
-      // Only include columns with at least one numeric value
+      if (SKIP_COL_LABELS.test(label)) continue;
       let hasNumeric = false;
       for (let r = hdrRow + 1; r < Math.min(data.length, hdrRow + 50); r++) {
         const v = String(data[r]?.[c] ?? '').trim();
@@ -669,27 +637,20 @@
     return result;
   }
 
-  // Keywords in ITEM_IDX that identify header/label rows (not real data rows)
   const HEADER_ITEM_LABELS = /^(item|total nre cost|hp pay|description|品名|項目|name)$/i;
 
-  // ── Skip blank / comment / title-only rows ────────────────────
   function shouldSkip(row, dataCols) {
     if (!row || row.every(v => String(v ?? '').trim() === '')) return true;
     const item = String(row[ITEM_IDX] ?? '').trim();
     if (!item) return true;
-    // Skip rows where col B is a header keyword (header row leaked into data)
     if (HEADER_ITEM_LABELS.test(item)) return true;
-    // Skip rows where col A (idx 0) is a plain number (row-sequence numbers)
     const col0 = String(row[0] ?? '').trim();
     if (col0 !== '' && /^\d+$/.test(col0)) return true;
-    // Skip item col that is a plain number
     if (/^\d+$/.test(item)) return true;
-    // Skip project/model title rows (start with a 4-digit year, or contain product name keywords)
     if (/^\d{4}|omnibook|flip_asia/i.test(item)) return true;
     if (item.startsWith('*')) return true;
     if (/will be paid/i.test(item)) return true;
     if (/^note$/i.test(item)) return true;
-    // Skip rows where every known data column is empty (title/section rows)
     if (dataCols && dataCols.length > 0) {
       const anyValue = dataCols.some(col => String(row[col.idx] ?? '').trim() !== '');
       if (!anyValue) return true;
@@ -699,19 +660,17 @@
 
   function calcDiff(nA, nB) {
     if (nA === null || nB === null) return { diff: null, pct: null };
-    const diff = nA - nB;                                    // A(HQ) − B(Wistron)
-    const pct  = nB !== 0 ? (diff / Math.abs(nB)) * 100 : null; // base = Wistron(B)
+    const diff = nA - nB;
+    const pct  = nB !== 0 ? (diff / Math.abs(nB)) * 100 : null;
     return { diff, pct };
   }
 
-  // ── Core: dynamic column comparison ──────────────────────────
   function compareData(data1, data2) {
     const hdr1 = findHeaderRow(data1);
     const hdr2 = findHeaderRow(data2);
     const cols1 = discoverCols(data1, hdr1);
     const cols2 = discoverCols(data2, hdr2);
 
-    // Union of columns from both files, matched by label
     const allLabels = [...new Set([...cols1.map(c => c.label), ...cols2.map(c => c.label)])];
     const cols = allLabels.map(label => ({
       label,
@@ -719,7 +678,6 @@
       idx2: cols2.find(c => c.label === label)?.idx ?? null,
     }));
 
-    // Build item → rowData maps (skip from hdrRow+1 onward)
     const buildMap = (data, hdrRow, dataCols) => {
       const m = new Map();
       for (let r = hdrRow + 1; r < data.length; r++) {
@@ -772,43 +730,23 @@
   }
 
   // ══════════════════════════════════════════════════════════════
-  //  ODM IUR SPECIAL MODE
+  //  ODM IUR SPECIAL MODE (unchanged)
   // ══════════════════════════════════════════════════════════════
 
-  function isOdmIurSheet(name) {
-    return /odm.?iur/i.test(name);
-  }
+  function isOdmIurSheet(name) { return /odm.?iur/i.test(name); }
+  function isNreSummarySheet(name) { return /nre.?summary/i.test(name); }
 
-  function isNreSummarySheet(name) {
-    return /nre.?summary/i.test(name);
-  }
-
-  // ── Normalize platform name for fuzzy matching ───────────────
-  // Strips "-PCBx" suffix so "WCL-PCB1" matches "WCL"
   function normPlatform(name) {
     return name.replace(/-PCB\d+\b/gi, '').replace(/\s+/g, ' ').trim().toLowerCase();
   }
 
-  // ── Parse HQ ODM IUR ─────────────────────────────────────────
-  // Intel  區塊：col0=Platform, col1=Qty, col2=U/P, col3=Total, col4=平台標題(Flip_Marina)
-  // Qualcomm 區塊：col7=Platform, col8=Qty, col9=U/P, col10=Total, col12=平台標題(Flip_Marina)
-  // 小計行：col3=Intel小計 / col10=Qualcomm小計
-  // Grand Total：行66 的 Total-Intel(col3) + Total-Qualcomm(col10) 彙總行
   function parseHqOdmIur(data) {
-    // ── 偵測 Qualcomm 標題欄：只掃 col11、col12 ──
-    // 條件：同時含「Qualcomm」AND「Flip_Marina」，且不是「Total-Qualcomm」彙總行
-    // col7 是說明文字，不使用
     const isQcomPlatHdr = v => /flip_?marina/i.test(v) && /qualcomm/i.test(v) && !/total.?qualcomm/i.test(v);
     let qcomHdrCol = -1;
     for (const c of [11, 12]) {
-      if (data.some(row => isQcomPlatHdr(String(row?.[c] ?? '')))) {
-        qcomHdrCol = c;
-        break;
-      }
+      if (data.some(row => isQcomPlatHdr(String(row?.[c] ?? '')))) { qcomHdrCol = c; break; }
     }
-    if (qcomHdrCol === -1) {
-      qcomHdrCol = 11;
-    }
+    if (qcomHdrCol === -1) qcomHdrCol = 11;
 
     const intelBlocks = [], qcomBlocks = [];
     const seenIntelKeys = new Set(), seenQcomKeys = new Set();
@@ -817,206 +755,105 @@
 
     for (let r = 0; r < data.length; r++) {
       const row = data[r] || [];
-      const s0  = String(row[0]          ?? '').trim();  // Intel Platform Name
-      const s2  = String(row[2]          ?? '').trim();  // Intel U/P
-      const s4  = String(row[4]          ?? '').trim();  // Intel 平台標題 (col4)
-      const s7  = String(row[7]          ?? '').trim();  // Qualcomm Platform Name
-      const s9  = String(row[9]          ?? '').trim();  // Qualcomm U/P
-      const sQH = String(row[qcomHdrCol] ?? '').trim();  // Qualcomm 平台標題
+      const s0  = String(row[0]          ?? '').trim();
+      const s2  = String(row[2]          ?? '').trim();
+      const s4  = String(row[4]          ?? '').trim();
+      const s7  = String(row[7]          ?? '').trim();
+      const s9  = String(row[9]          ?? '').trim();
+      const sQH = String(row[qcomHdrCol] ?? '').trim();
 
       const isIntelHdr = /flip_?marina/i.test(s4);
-      const isQcomHdr  = isQcomPlatHdr(sQH);  // 必須同時含 Qualcomm + Flip_Marina，且非 Total
+      const isQcomHdr  = isQcomPlatHdr(sQH);
 
-      // Intel 平台標題
       if (isIntelHdr) {
         const key = normPlatform(s4);
         if (seenIntelKeys.has(key)) { curIntel = null; }
-        else {
-          seenIntelKeys.add(key);
-          curIntel = { header: s4, key, subtotalAmt: null, items: [], chipset: 'intel' };
-          intelBlocks.push(curIntel);
-        }
+        else { seenIntelKeys.add(key); curIntel = { header: s4, key, subtotalAmt: null, items: [], chipset: 'intel' }; intelBlocks.push(curIntel); }
       }
-
-      // Qualcomm 平台標題
       if (isQcomHdr) {
         const key = normPlatform(sQH);
         if (seenQcomKeys.has(key)) { curQcom = null; }
-        else {
-          seenQcomKeys.add(key);
-          curQcom = { header: sQH, key, subtotalAmt: null, items: [], chipset: 'qcom' };
-          qcomBlocks.push(curQcom);
-        }
+        else { seenQcomKeys.add(key); curQcom = { header: sQH, key, subtotalAmt: null, items: [], chipset: 'qcom' }; qcomBlocks.push(curQcom); }
       }
-
-      // Intel 資料行
-      if (curIntel && !isIntelHdr && s0 && !SKIP.test(s0) && parseNum(row[1]) !== null) {
+      if (curIntel && !isIntelHdr && s0 && !SKIP.test(s0) && parseNum(row[1]) !== null)
         curIntel.items.push({ platform: s0, qty: parseNum(row[1]), up: parseNum(s2), totalAmt: parseNum(row[3]) });
-      }
-      // Intel 小計
-      if (curIntel && !isIntelHdr && !s0 && typeof row[3] === 'number') {
-        curIntel.subtotalAmt = row[3];
-      }
-
-      // Qualcomm 資料行
+      if (curIntel && !isIntelHdr && !s0 && typeof row[3] === 'number') curIntel.subtotalAmt = row[3];
       const qcQty = parseNum(row[8]);
-      if (curQcom && !isQcomHdr && s7 && !SKIP.test(s7) && qcQty !== null) {
+      if (curQcom && !isQcomHdr && s7 && !SKIP.test(s7) && qcQty !== null)
         curQcom.items.push({ platform: s7, qty: qcQty, up: parseNum(s9), totalAmt: parseNum(row[10]) });
-      }
-      // Qualcomm 小計
-      if (curQcom && !isQcomHdr && !s7 && typeof row[10] === 'number') {
-        curQcom.subtotalAmt = row[10];
-      }
+      if (curQcom && !isQcomHdr && !s7 && typeof row[10] === 'number') curQcom.subtotalAmt = row[10];
     }
 
-    // Grand Total：取行66的 Total-Intel(col3) 和 Total-Qualcomm(col10) 彙總值
     let intelAmt = null, qcomAmt = null;
     for (const row of data) {
-      const s0 = String(row[0] ?? '').trim();
-      const s1 = String(row[1] ?? '').trim();
-      const s7 = String(row[7] ?? '').trim();
-      const s8 = String(row[8] ?? '').trim();
-      if ((/total.?intel/i.test(s0) || /total.?intel/i.test(s1)) && typeof row[3] === 'number') {
-        intelAmt = row[3];  // 取最後一個符合行（即彙總行）
-      }
-      if ((/total.?qualcomm/i.test(s7) || /total.?qualcomm/i.test(s8)) && typeof row[10] === 'number') {
-        qcomAmt = row[10];  // 取最後一個符合行（即彙總行）
-      }
+      const s0 = String(row[0] ?? '').trim(); const s1 = String(row[1] ?? '').trim();
+      const s7 = String(row[7] ?? '').trim(); const s8 = String(row[8] ?? '').trim();
+      if ((/total.?intel/i.test(s0) || /total.?intel/i.test(s1)) && typeof row[3] === 'number') intelAmt = row[3];
+      if ((/total.?qualcomm/i.test(s7) || /total.?qualcomm/i.test(s8)) && typeof row[10] === 'number') qcomAmt = row[10];
     }
     const grandTotal = (intelAmt ?? 0) + (qcomAmt ?? 0);
     const blocks = [...intelBlocks, ...qcomBlocks];
     return { blocks, intelBlocks, qcomBlocks, qualcommPlatforms: qcomBlocks, grandTotal, intelAmt, qcomAmt };
   }
 
-  // ── Parse Wistron ODM IUR ─────────────────────────────────────
-  // Intel 區塊 (col0-6)：
-  //   col0=Platform, col1=QtyWHQ, col2=QtyWCQ, col3=U/P
-  //   col4=SubWHQ,   col5=SubWCQ, col6=Total / 平台標題(Flip_Marina)
-  //   平台標題：col0 空 AND col6 含 Flip_Marina AND 非 Total
-  //   小計行：col0 空 AND col6 是數字
-  //
-  // Qualcomm 區塊 (col8-15, 行97後)：
-  //   col9=Platform, col10=QtyWHQ, col11=QtyWCQ, col12=U/P
-  //   col13=SubWHQ,  col14=SubWCQ, col15=Total / 平台標題(Flip_Marina)
-  //   平台標題：col15 含 Flip_Marina
-  //   小計行：col9 空 AND col15 是數字
-  //
-  // Grand Total：Intel(col0='ODM IUR' AND col6=number) +
-  //              Qualcomm(col8='ODM IUR' AND col15=number)
   function parseWistronOdmIur(data) {
     const blocks = [];
     let cur = null;
     const SKIP_0 = /^(free\s*sample(\s*\(cpu\))?|odm\s*iur|platform\s*name|qty\.?)$/i;
 
-    // ── Intel 區塊 ──
     for (let r = 0; r < data.length; r++) {
       const row = data[r] || [];
       const s0 = String(row[0] ?? '').trim();
       const s6 = String(row[6] ?? '').trim();
-
-      // 平台標題：col0 空 AND col6 含 Flip_Marina
       if (!s0 && /flip_?marina/i.test(s6) && !/total/i.test(s6)) {
         cur = { header: s6, key: normPlatform(s6), subtotalAmtWhq: null, subtotalAmtWcq: null, subtotalAmt: null, items: [] };
-        blocks.push(cur);
-        continue;
+        blocks.push(cur); continue;
       }
       if (!cur) continue;
-
-      // ODM IUR 彙總行：col0='ODM IUR' AND col6 是數字 → 當作平台小計
       if (/^odm\s*iur$/i.test(s0) && typeof row[6] === 'number') {
         cur.subtotalAmtWhq = typeof row[4] === 'number' ? row[4] : null;
         cur.subtotalAmtWcq = typeof row[5] === 'number' ? row[5] : null;
-        cur.subtotalAmt    = row[6];
-        continue;
+        cur.subtotalAmt    = row[6]; continue;
       }
-
-      // 其他略過行
       if (s0 && SKIP_0.test(s0)) continue;
-
-      // 資料行
-      if (s0) {
-        cur.items.push({
-          platform:  s0,
-          qtyWhq:    parseNum(row[1]),
-          qtyWcq:    parseNum(row[2]),
-          up:        parseNum(row[3]),
-          subAmtWhq: parseNum(row[4]),
-          subAmtWcq: parseNum(row[5]),
-          totalAmt:  parseNum(row[6]),
-        });
-      }
+      if (s0) cur.items.push({ platform: s0, qtyWhq: parseNum(row[1]), qtyWcq: parseNum(row[2]), up: parseNum(row[3]), subAmtWhq: parseNum(row[4]), subAmtWcq: parseNum(row[5]), totalAmt: parseNum(row[6]) });
     }
 
-    // ── Qualcomm 區塊：掃描 col7-col15 找 Flip_Marina（Intel col6 以外）──
     const SKIP_9 = /^(platform\s*name|free\s*sample(\s*\(cpu\))?|odm\s*iur|whq|qty\.?)/i;
     let qcomHdrColW = -1;
     for (let c = 7; c <= 15; c++) {
-      if (data.some(row => /flip_?marina/i.test(String(row?.[c] ?? '')))) {
-        qcomHdrColW = c;
-        break;
-      }
+      if (data.some(row => /flip_?marina/i.test(String(row?.[c] ?? '')))) { qcomHdrColW = c; break; }
     }
-    if (qcomHdrColW === -1) {
-      qcomHdrColW = 15;  // fallback
-    }
-    // Qualcomm 資料欄：Platform = qcomHdrColW - 6（相對偏移）
-    // 已知：col9=Platform, col10=QtyWHQ, col11=QtyWCQ, col12=U/P, col13=SubWHQ, col14=SubWCQ, col15=Total
-    // 若標題欄不是15，則 Platform 欄 = qcomHdrColW - 6
+    if (qcomHdrColW === -1) qcomHdrColW = 15;
     const qcPlatCol  = qcomHdrColW === 15 ? 9  : qcomHdrColW - 6;
     const qcTotalCol = qcomHdrColW;
-
     let curQ = null;
 
     for (let r = 0; r < data.length; r++) {
-      const row  = data[r] || [];
-      const s9   = String(row[qcPlatCol]  ?? '').trim();
-      const s15  = String(row[qcTotalCol] ?? '').trim();
-
-      // 平台標題：Qualcomm標題欄含 Flip_Marina
+      const row = data[r] || [];
+      const s9  = String(row[qcPlatCol]  ?? '').trim();
+      const s15 = String(row[qcTotalCol] ?? '').trim();
       if (/flip_?marina/i.test(s15)) {
         curQ = { header: s15, key: normPlatform(s15), subtotalAmtWhq: null, subtotalAmtWcq: null, subtotalAmt: null, items: [], chipset: 'qcom' };
-        blocks.push(curQ);
-        continue;
+        blocks.push(curQ); continue;
       }
       if (!curQ) continue;
-
-      // ODM IUR 彙總行：col8='ODM IUR' AND col14 是數字 → 當作 Qualcomm 平台小計
       const s8 = String(row[8] ?? '').trim();
       if (/^odm\s*iur$/i.test(s8) && typeof row[14] === 'number') {
         curQ.subtotalAmtWhq = typeof row[12] === 'number' ? row[12] : null;
         curQ.subtotalAmtWcq = typeof row[13] === 'number' ? row[13] : null;
-        curQ.subtotalAmt    = row[14];
-        continue;
+        curQ.subtotalAmt    = row[14]; continue;
       }
-
       if (s9 && SKIP_9.test(s9)) continue;
-
-      // 資料行：Platform 欄有值
-      if (s9) {
-        curQ.items.push({
-          platform:  s9,
-          qtyWhq:    parseNum(row[qcPlatCol + 1]),
-          qtyWcq:    parseNum(row[qcPlatCol + 2]),
-          up:        parseNum(row[qcPlatCol + 3]),
-          subAmtWhq: parseNum(row[qcTotalCol - 2]),
-          subAmtWcq: parseNum(row[qcTotalCol - 1]),
-          totalAmt:  parseNum(row[qcTotalCol]),
-        });
-      }
+      if (s9) curQ.items.push({ platform: s9, qtyWhq: parseNum(row[qcPlatCol+1]), qtyWcq: parseNum(row[qcPlatCol+2]), up: parseNum(row[qcPlatCol+3]), subAmtWhq: parseNum(row[qcTotalCol-2]), subAmtWcq: parseNum(row[qcTotalCol-1]), totalAmt: parseNum(row[qcTotalCol]) });
     }
     const qcomBlocksW = blocks.filter(b => b.chipset === 'qcom');
     const intelBlocks = blocks.filter(b => !b.chipset);
-    // Grand Total = 各平台 ODM IUR 彙總行的值加總
     const intelGrandTotal    = intelBlocks.reduce((s, b) => s + (b.subtotalAmt ?? 0), 0);
     const qualcommGrandTotal = qcomBlocksW.reduce((s, b) => s + (b.subtotalAmt ?? 0), 0);
-    const grandTotal = intelGrandTotal + qualcommGrandTotal;
-    return { blocks, qualcommPlatforms: qcomBlocksW, grandTotal, intelGrandTotal, qualcommGrandTotal };
+    return { blocks, qualcommPlatforms: qcomBlocksW, grandTotal: intelGrandTotal + qualcommGrandTotal, intelGrandTotal, qualcommGrandTotal };
   }
 
-  // ── Detect ODM IUR format ─────────────────────────────────────
-  // col0=B  col1=C  col2=D  col3=E  col4=F  col5=G  col6=H
-  // Wistron: any row where col1 (C欄) = 'WHQ'
-  // HQ:      any row where col4 (F欄) contains 'Flip_Marina'
   function detectOdmFormat(data) {
     let hasWhq = false, hasFlip = false;
     for (let i = 0; i < data.length; i++) {
@@ -1032,8 +869,6 @@
     return 'unknown';
   }
 
-  // ── Compare ODM IUR ───────────────────────────────────────────
-  // Auto-detect format for each file; left panel = file A, right panel = file B
   function compareOdmIur(data1, data2) {
     const fmtA = detectOdmFormat(data1);
     const fmtB = detectOdmFormat(data2);
@@ -1052,39 +887,27 @@
     };
   }
 
-  // ── Render ODM IUR (side-by-side panels) ─────────────────────
-  // Each panel uses its own detected format (wistron=7cols, hq=4cols)
   function renderOdmIur(result, sheetName, nameA, nameB) {
     const { aBlocks, bBlocks, fmtA, fmtB, aGrandTotal, bGrandTotal,
             aIntelAmt, aQcomAmt, bIntelAmt, bQcomAmt,
             aIntelBlocks, aQcomBlocks, bIntelBlocks, bQcomBlocks } = result;
-
-    // ── 確認 Qualcomm 平台是否正確載入 ──
     const aQcomInBlocks = aBlocks.filter(b => b.chipset === 'qcom');
     const bQcomInBlocks = bBlocks.filter(b => b.chipset === 'qcom');
-;
-    // ── ──
 
     const makeNote = (fmt, intelAmt, qcomAmt) => {
       const intel = intelAmt != null ? fmtNumOdm(intelAmt) : '—';
       const qcom  = qcomAmt  != null ? fmtNumOdm(qcomAmt)  : '—';
-      if (fmt === 'hq') {
-        return `* Grand Total = Intel Total (${intel}) + Qualcomm Total (${qcom}) + PTL 444/484/NVL 484 Scenario\n  如需確認完整金額請參閱 NRE Summary 工作表`;
-      }
+      if (fmt === 'hq') return `* Grand Total = Intel Total (${intel}) + Qualcomm Total (${qcom}) + PTL 444/484/NVL 484 Scenario\n  如需確認完整金額請參閱 NRE Summary 工作表`;
       return `* Grand Total = Intel 小計 (${intel}) + Qualcomm 小計 (${qcom})\n  如需確認完整金額請參閱 NRE Summary 工作表`;
     };
 
-    // File A (Wistron): Platform | Qty WHQ | Qty WCQ | U/P | Sub Amt WHQ | Sub Amt WCQ | Total Amt
     const buildARows = (blocks, grandTotal, note) => {
       if (!blocks.length) return `<tr><td colspan="7" class="truncate-notice">（無資料）</td></tr>`;
       let rows = '', even = 0, lastChipset = null;
       for (const blk of blocks) {
-        // chipset 切換時加分隔行
         if (blk.chipset && blk.chipset !== lastChipset) {
           if (lastChipset !== null) rows += `<tr class="odm-chipset-sep"><td colspan="7"></td></tr>`;
-          const chipLabel = blk.chipset === 'qcom'
-            ? `<span style="color:#fb923c;font-weight:700;">◈ Qualcomm</span>`
-            : `<span style="color:#a78bfa;font-weight:700;">◈ Intel</span>`;
+          const chipLabel = blk.chipset === 'qcom' ? `<span style="color:#fb923c;font-weight:700;">◈ Qualcomm</span>` : `<span style="color:#a78bfa;font-weight:700;">◈ Intel</span>`;
           rows += `<tr><td colspan="7" style="padding:6px 12px;font-size:.78rem;background:rgba(255,255,255,.03);">${chipLabel}</td></tr>`;
           lastChipset = blk.chipset;
         }
@@ -1092,46 +915,28 @@
         rows += `<tr class="${hdrClass}"><td colspan="7">${esc(blk.header)}</td></tr>`;
         for (const it of blk.items) {
           rows += `<tr class="${even++ % 2 ? 'odm-data-even' : ''}">
-            <td>${esc(it.platform)}</td>
-            <td>${esc(fmtNumOdm(it.qtyWhq))}</td>
-            <td>${esc(fmtNumOdm(it.qtyWcq))}</td>
-            <td>${esc(fmtNumOdm(it.up))}</td>
-            <td>${esc(fmtNumOdm(it.subAmtWhq))}</td>
-            <td>${esc(fmtNumOdm(it.subAmtWcq))}</td>
-            <td>${esc(fmtNumOdm(it.totalAmt))}</td>
-          </tr>`;
+            <td>${esc(it.platform)}</td><td>${esc(fmtNumOdm(it.qtyWhq))}</td><td>${esc(fmtNumOdm(it.qtyWcq))}</td>
+            <td>${esc(fmtNumOdm(it.up))}</td><td>${esc(fmtNumOdm(it.subAmtWhq))}</td>
+            <td>${esc(fmtNumOdm(it.subAmtWcq))}</td><td>${esc(fmtNumOdm(it.totalAmt))}</td></tr>`;
         }
         if (blk.subtotalAmt !== null) {
-          rows += `<tr class="odm-subtotal">
-            <td>小計</td><td></td><td></td><td></td>
-            <td>${esc(fmtNumOdm(blk.subtotalAmtWhq))}</td>
-            <td>${esc(fmtNumOdm(blk.subtotalAmtWcq))}</td>
-            <td>${esc(fmtNumOdm(blk.subtotalAmt))}</td>
-          </tr>`;
+          rows += `<tr class="odm-subtotal"><td>小計</td><td></td><td></td><td></td>
+            <td>${esc(fmtNumOdm(blk.subtotalAmtWhq))}</td><td>${esc(fmtNumOdm(blk.subtotalAmtWcq))}</td>
+            <td>${esc(fmtNumOdm(blk.subtotalAmt))}</td></tr>`;
         }
       }
-      rows += `<tr class="odm-grand-total">
-        <td>🏁 Grand Total</td><td></td><td></td><td></td><td></td><td></td>
-        <td>${esc(fmtNumOdm(grandTotal))}</td>
-      </tr>
+      rows += `<tr class="odm-grand-total"><td>🏁 Grand Total</td><td></td><td></td><td></td><td></td><td></td><td>${esc(fmtNumOdm(grandTotal))}</td></tr>
       <tr><td colspan="7" class="odm-note-row">${esc(note)}</td></tr>`;
       return rows;
     };
 
-    // File B (HQ): Intel 和 Qualcomm 分開顯示，各平台標題顏色不同
     const buildBRows = (blocks, grandTotal, note) => {
       if (!blocks.length) return `<tr><td colspan="4" class="truncate-notice">（無資料）</td></tr>`;
-      let rows = '', even = 0;
-      let lastChipset = null;
+      let rows = '', even = 0, lastChipset = null;
       for (const blk of blocks) {
-        // 當 chipset 切換時加分隔行與 chipset 標題
         if (blk.chipset && blk.chipset !== lastChipset) {
-          if (lastChipset !== null) {
-            rows += `<tr class="odm-chipset-sep"><td colspan="4"></td></tr>`;
-          }
-          const chipLabel = blk.chipset === 'intel'
-            ? `<span style="color:#a78bfa;font-weight:700;">◈ Intel</span>`
-            : `<span style="color:#fb923c;font-weight:700;">◈ Qualcomm</span>`;
+          if (lastChipset !== null) rows += `<tr class="odm-chipset-sep"><td colspan="4"></td></tr>`;
+          const chipLabel = blk.chipset === 'intel' ? `<span style="color:#a78bfa;font-weight:700;">◈ Intel</span>` : `<span style="color:#fb923c;font-weight:700;">◈ Qualcomm</span>`;
           rows += `<tr><td colspan="4" style="padding:6px 12px;font-size:.78rem;background:rgba(255,255,255,.03);">${chipLabel}</td></tr>`;
           lastChipset = blk.chipset;
         }
@@ -1139,39 +944,22 @@
         rows += `<tr class="${hdrClass}"><td colspan="4">${esc(blk.header)}</td></tr>`;
         for (const it of blk.items) {
           rows += `<tr class="${even++ % 2 ? 'odm-data-even' : ''}">
-            <td>${esc(it.platform)}</td>
-            <td>${esc(fmtNumOdm(it.qty))}</td>
-            <td>${esc(fmtNumOdm(it.up))}</td>
-            <td>${esc(fmtNumOdm(it.totalAmt))}</td>
-          </tr>`;
+            <td>${esc(it.platform)}</td><td>${esc(fmtNumOdm(it.qty))}</td>
+            <td>${esc(fmtNumOdm(it.up))}</td><td>${esc(fmtNumOdm(it.totalAmt))}</td></tr>`;
         }
         if (blk.subtotalAmt !== null) {
-          rows += `<tr class="odm-subtotal">
-            <td>小計</td><td></td><td></td>
-            <td>${esc(fmtNumOdm(blk.subtotalAmt))}</td>
-          </tr>`;
+          rows += `<tr class="odm-subtotal"><td>小計</td><td></td><td></td><td>${esc(fmtNumOdm(blk.subtotalAmt))}</td></tr>`;
         }
       }
-      rows += `<tr class="odm-grand-total">
-        <td>🏁 Grand Total</td><td></td><td></td>
-        <td>${esc(fmtNumOdm(grandTotal))}</td>
-      </tr>
+      rows += `<tr class="odm-grand-total"><td>🏁 Grand Total</td><td></td><td></td><td>${esc(fmtNumOdm(grandTotal))}</td></tr>
       <tr><td colspan="4" class="odm-note-row">${esc(note)}</td></tr>`;
       return rows;
     };
 
-    const thWis = `
-      <th style="text-align:left;min-width:110px">Platform</th>
-      <th>Qty<br><small>WHQ</small></th><th>Qty<br><small>WCQ</small></th>
-      <th>U/P</th>
-      <th>Sub Amt<br><small>WHQ</small></th><th>Sub Amt<br><small>WCQ</small></th>
-      <th>Total Amt</th>`;
-    const thHq = `
-      <th style="text-align:left;min-width:110px">Platform</th>
-      <th>Qty</th><th>U/P</th><th>Total Amt</th>`;
-
-    const thA = fmtA === 'wistron' ? thWis : thHq;
-    const thB = fmtB === 'wistron' ? thWis : thHq;
+    const thWis = `<th style="text-align:left;min-width:110px">Platform</th><th>Qty<br><small>WHQ</small></th><th>Qty<br><small>WCQ</small></th><th>U/P</th><th>Sub Amt<br><small>WHQ</small></th><th>Sub Amt<br><small>WCQ</small></th><th>Total Amt</th>`;
+    const thHq  = `<th style="text-align:left;min-width:110px">Platform</th><th>Qty</th><th>U/P</th><th>Total Amt</th>`;
+    const thA   = fmtA === 'wistron' ? thWis : thHq;
+    const thB   = fmtB === 'wistron' ? thWis : thHq;
     const noteA = makeNote(fmtA, aIntelAmt, aQcomAmt);
     const noteB = makeNote(fmtB, bIntelAmt, bQcomAmt);
     const rowsA = fmtA === 'wistron' ? buildARows(aBlocks, aGrandTotal, noteA) : buildBRows(aBlocks, aGrandTotal, noteA);
@@ -1199,15 +987,11 @@
         <div class="odm-panels">
           <div class="odm-panel odm-panel-wis">
             <div class="odm-panel-title">🔵 ${esc(nameA)}</div>
-            <div class="odm-panel-scroll">
-              <table><thead><tr>${thA}</tr></thead><tbody>${rowsA}</tbody></table>
-            </div>
+            <div class="odm-panel-scroll"><table><thead><tr>${thA}</tr></thead><tbody>${rowsA}</tbody></table></div>
           </div>
           <div class="odm-panel odm-panel-hq">
             <div class="odm-panel-title">🟢 ${esc(nameB)}</div>
-            <div class="odm-panel-scroll">
-              <table><thead><tr>${thB}</tr></thead><tbody>${rowsB}</tbody></table>
-            </div>
+            <div class="odm-panel-scroll"><table><thead><tr>${thB}</tr></thead><tbody>${rowsB}</tbody></table></div>
           </div>
         </div>
       </div>`;
@@ -1218,14 +1002,14 @@
   }
 
   // ══════════════════════════════════════════════════════════════
-  //  ODM RD RESOURCE SPECIAL MODE
+  //  ODM RD RESOURCE SPECIAL MODE  ← 重寫修正版
   // ══════════════════════════════════════════════════════════════
 
   function isOdmRdSheet(name) {
     return /odm.*rd|rd.*resource/i.test(name);
   }
 
-  // Detect HQ vs Wistron for RD resource sheet — scan first 15 rows
+  // ── Format detection (unchanged) ────────────────────────────
   function detectOdmRdFormat(data) {
     const PLAT_KW = /intel|qualcomm|wcl|ptl|nvl|purwa|flip|marina/i;
     const RD_KW   = /rd\s*resource/i;
@@ -1245,115 +1029,205 @@
     return 'unknown';
   }
 
-  // Extract a short keyword for fuzzy platform matching
-  function rdKeyword(name) {
-    const n = (name || '').toUpperCase();
-    if (/\bWCL\b/.test(n))                           return 'WCL';
-    if (/\bPTL\b/.test(n))                           return 'PTL';
-    if (/\bNVL\b/.test(n))                           return 'NVL';
-    if (/\bPURWA\b/.test(n))                         return 'PURWA';
-    if (/\bFLIP\b/.test(n) || /\bMARINA\b/.test(n)) return 'MARINA';
-    if (/\bQUALCOMM\b/.test(n))                      return 'QUALCOMM';
-    return null;
-  }
-
+  // ══════════════════════════════════════════════════════════════
+  // parseOdmRdPlatforms  — 全新通用版
+  //
+  // 核心思路（同時支援 HQ 和 Wistron）：
+  //   1. 掃描所有行，找「Total cost amount」欄位出現的列（欄位 header 行）
+  //      → 每個欄位 header 行定義了一組 9 欄群組的結構
+  //      → 一個 sheet 可能有多個群組（水平排列）
+  //   2. 對每個群組的 endCol（Total cost amount 欄）：
+  //      掃描所有行，當 startCol（=endCol-8）為空且 endCol 有平台關鍵字 → 平台標題行
+  //   3. 從平台標題行後的 Job function header 開始，讀資料直到 Total amount
+  //   4. 垂直堆疊（同一群組多個平台）自然處理
+  // ══════════════════════════════════════════════════════════════
   function parseOdmRdPlatforms(data) {
     const PLAT_KW       = /intel|qualcomm|wcl|ptl|nvl|purwa|flip|marina/i;
     const TOTAL_COST_KW = /total\s*cost\s*amount|total\s*cost/i;
     const JOB_FUNC_KW   = /^job\s*(function|func)/i;
-    const TOTAL_AMT_KW  = /^total\s*(amount)?/i;
-
-    const endCols = new Set();
-    for (let r = 0; r < Math.min(data.length, 10); r++) {
-      const row = data[r] || [];
-      for (let c = 0; c < row.length; c++) {
-        if (TOTAL_COST_KW.test(String(row[c] ?? '').trim())) endCols.add(c);
-      }
-    }
-    if (endCols.size === 0) endCols.add(8);
+    const TOTAL_AMT_KW  = /^total\s*(amount|amount\s*\(|amt)/i;
+    const RD_WAVE_KW    = /^rd\s*resource/i;
+    const EXCLUDE_KW    = /same as intel|same as above|refer to|note:|remark/i;
 
     const platforms = [];
-    for (const endCol of [...endCols].sort((a, b) => a - b)) {
-      const startCol = endCol - 8;
-      if (startCol < 0) continue;
-      let currentPlat = null;
-      let inData = false;
-      let fo = { headCounts:1, senior:2, seniorCost:3, junior:4, juniorCost:5, dedication:6, timeLen:7, totalCost:8 };
+
+    // Auto-detect: HQ has "RD resource - WaveN" in col 0 as section headers
+    let isHqStyle = false;
+    for (let r = 0; r < data.length; r++) {
+      const s0 = String(data[r]?.[0] ?? \'\').trim();
+      if (RD_WAVE_KW.test(s0)) { isHqStyle = true; break; }
+    }
+
+    if (isHqStyle) {
+      // HQ style: each "RD resource - WaveN" row starts a platform section
       for (let r = 0; r < data.length; r++) {
         const row = data[r] || [];
-        const s0 = String(row[startCol] ?? '').trim();
-        const sE = String(row[endCol]   ?? '').trim();
-        const EXCLUDE_KW = /same as intel|same as above|refer to|note:|remark/i;
-        // Wistron-style: startCol empty, endCol has platform keyword
-        if (!s0 && PLAT_KW.test(sE) && !EXCLUDE_KW.test(sE)) {
-          if (currentPlat && (currentPlat.rows.length > 0 || currentPlat.totalAmt !== null)) platforms.push(currentPlat);
-          currentPlat = { name: sE, rows: [], totalAmt: null };
-          inData = false; continue;
+        const s0 = String(row[0] ?? \'\').trim();
+        if (!RD_WAVE_KW.test(s0)) continue;
+
+        // Platform name is somewhere in this row (not col 0)
+        let platName = s0;
+        for (let c = 1; c < row.length; c++) {
+          const v = String(row[c] ?? \'\').trim();
+          if (v && PLAT_KW.test(v) && !EXCLUDE_KW.test(v)) { platName = v; break; }
         }
-        // HQ-style: startCol has platform keyword, middle cols (1-7) all empty
-        if (PLAT_KW.test(s0) && !JOB_FUNC_KW.test(s0) && !TOTAL_AMT_KW.test(s0) && !EXCLUDE_KW.test(s0)) {
-          const midEmpty = [1,2,3,4,5,6].every(off => !String(row[startCol+off] ?? '').trim());
-          if (midEmpty) {
+
+        // Field header row = r+1
+        const fhr = r + 1;
+        const fhrRow = data[fhr] || [];
+        let fo = { headCounts:1, senior:2, seniorCost:3, junior:4, juniorCost:5, dedication:6, timeLen:7, totalCost:8 };
+        for (let c = 1; c < fhrRow.length; c++) {
+          const v = String(fhrRow[c] ?? \'\').trim().toLowerCase();
+          const off = c;
+          if (/total.*cost|cost.*amount/i.test(v))       fo.totalCost  = off;
+          else if (/head.*count|total.*head/i.test(v))   fo.headCounts = off;
+          else if (/senior.*cost|cost.*senior/i.test(v)) fo.seniorCost = off;
+          else if (/junior.*cost|cost.*junior/i.test(v)) fo.juniorCost = off;
+          else if (/^senior/i.test(v))                   fo.senior     = off;
+          else if (/^junior/i.test(v))                   fo.junior     = off;
+          else if (/dedic/i.test(v))                     fo.dedication = off;
+          else if (/time|month/i.test(v))                fo.timeLen    = off;
+        }
+
+        const rows = [];
+        let totalAmt = null;
+        for (let dr = fhr + 1; dr < data.length; dr++) {
+          const drow = data[dr] || [];
+          const jobFunc = String(drow[0] ?? \'\').trim();
+          if (!jobFunc) continue;
+          if (RD_WAVE_KW.test(jobFunc)) break;
+          if (JOB_FUNC_KW.test(jobFunc)) continue;
+          if (TOTAL_AMT_KW.test(jobFunc)) {
+            totalAmt = parseNum(drow[fo.totalCost]);
+            break;
+          }
+          rows.push({
+            jobFunc,
+            headCounts: parseNum(drow[fo.headCounts]),
+            senior:     parseNum(drow[fo.senior]),
+            seniorCost: parseNum(drow[fo.seniorCost]),
+            junior:     parseNum(drow[fo.junior]),
+            juniorCost: parseNum(drow[fo.juniorCost]),
+            dedication: parseNum(drow[fo.dedication]),
+            timeLen:    parseNum(drow[fo.timeLen]),
+            totalCost:  parseNum(drow[fo.totalCost]),
+          });
+        }
+        if (rows.length > 0 || totalAmt !== null) platforms.push({ name: platName, rows, totalAmt });
+      }
+
+    } else {
+      // Wistron style: platform name at endCol when startCol is empty
+      const endCols = new Set();
+      for (let r = 0; r < Math.min(data.length, 10); r++) {
+        const row = data[r] || [];
+        for (let c = 0; c < row.length; c++) {
+          if (TOTAL_COST_KW.test(String(row[c] ?? \'\').trim())) endCols.add(c);
+        }
+      }
+      if (endCols.size === 0) endCols.add(8);
+
+      for (const endCol of [...endCols].sort((a, b) => a - b)) {
+        const startCol = endCol - 8;
+        if (startCol < 0) continue;
+        let currentPlat = null;
+        let inData = false;
+        let fo = { headCounts:1, senior:2, seniorCost:3, junior:4, juniorCost:5, dedication:6, timeLen:7, totalCost:8 };
+        for (let r = 0; r < data.length; r++) {
+          const row = data[r] || [];
+          const s0 = String(row[startCol] ?? \'\').trim();
+          const sE = String(row[endCol]   ?? \'\').trim();
+          if (!s0 && PLAT_KW.test(sE) && !EXCLUDE_KW.test(sE)) {
             if (currentPlat && (currentPlat.rows.length > 0 || currentPlat.totalAmt !== null)) platforms.push(currentPlat);
-            currentPlat = { name: s0, rows: [], totalAmt: null };
+            currentPlat = { name: sE, rows: [], totalAmt: null };
             inData = false; continue;
           }
-        }
-        if (!currentPlat) continue;
-        if (JOB_FUNC_KW.test(s0)) {
-          fo = { headCounts:1, senior:2, seniorCost:3, junior:4, juniorCost:5, dedication:6, timeLen:7, totalCost:8 };
-          for (let c = startCol + 1; c <= endCol; c++) {
-            const v = String(row[c] ?? '').trim().toLowerCase();
-            const off = c - startCol;
-            if (/total.*cost|cost.*amount/i.test(v))       fo.totalCost  = off;
-            else if (/head.*count|total.*head/i.test(v))   fo.headCounts = off;
-            else if (/senior.*cost|cost.*senior/i.test(v)) fo.seniorCost = off;
-            else if (/junior.*cost|cost.*junior/i.test(v)) fo.juniorCost = off;
-            else if (/^senior/i.test(v))                   fo.senior     = off;
-            else if (/^junior/i.test(v))                   fo.junior     = off;
-            else if (/dedic/i.test(v))                     fo.dedication = off;
-            else if (/time|month/i.test(v))                fo.timeLen    = off;
+          if (!currentPlat) continue;
+          if (JOB_FUNC_KW.test(s0)) {
+            fo = { headCounts:1, senior:2, seniorCost:3, junior:4, juniorCost:5, dedication:6, timeLen:7, totalCost:8 };
+            for (let c = startCol + 1; c <= endCol; c++) {
+              const v = String(row[c] ?? \'\').trim().toLowerCase();
+              const off = c - startCol;
+              if (/total.*cost|cost.*amount/i.test(v))       fo.totalCost  = off;
+              else if (/head.*count|total.*head/i.test(v))   fo.headCounts = off;
+              else if (/senior.*cost|cost.*senior/i.test(v)) fo.seniorCost = off;
+              else if (/junior.*cost|cost.*junior/i.test(v)) fo.juniorCost = off;
+              else if (/^senior/i.test(v))                   fo.senior     = off;
+              else if (/^junior/i.test(v))                   fo.junior     = off;
+              else if (/dedic/i.test(v))                     fo.dedication = off;
+              else if (/time|month/i.test(v))                fo.timeLen    = off;
+            }
+            inData = true; continue;
           }
-          inData = true; continue;
+          if (!inData) continue;
+          if (TOTAL_AMT_KW.test(s0)) {
+            currentPlat.totalAmt = parseNum(row[startCol + fo.totalCost]);
+            inData = false; continue;
+          }
+          if (s0) currentPlat.rows.push({
+            jobFunc: s0,
+            headCounts: parseNum(row[startCol + fo.headCounts]),
+            senior:     parseNum(row[startCol + fo.senior]),
+            seniorCost: parseNum(row[startCol + fo.seniorCost]),
+            junior:     parseNum(row[startCol + fo.junior]),
+            juniorCost: parseNum(row[startCol + fo.juniorCost]),
+            dedication: parseNum(row[startCol + fo.dedication]),
+            timeLen:    parseNum(row[startCol + fo.timeLen]),
+            totalCost:  parseNum(row[startCol + fo.totalCost]),
+          });
         }
-        if (!inData) continue;
-        if (TOTAL_AMT_KW.test(s0)) {
-          currentPlat.totalAmt = parseNum(row[startCol + fo.totalCost]);
-          inData = false; continue;
-        }
-        if (s0) currentPlat.rows.push({
-          jobFunc: s0,
-          headCounts: parseNum(row[startCol + fo.headCounts]),
-          senior:     parseNum(row[startCol + fo.senior]),
-          seniorCost: parseNum(row[startCol + fo.seniorCost]),
-          junior:     parseNum(row[startCol + fo.junior]),
-          juniorCost: parseNum(row[startCol + fo.juniorCost]),
-          dedication: parseNum(row[startCol + fo.dedication]),
-          timeLen:    parseNum(row[startCol + fo.timeLen]),
-          totalCost:  parseNum(row[startCol + fo.totalCost]),
-        });
+        if (currentPlat && (currentPlat.rows.length > 0 || currentPlat.totalAmt !== null)) platforms.push(currentPlat);
       }
-      if (currentPlat && (currentPlat.rows.length > 0 || currentPlat.totalAmt !== null)) platforms.push(currentPlat);
     }
+
     return platforms;
   }
-
-  // ── Build raw-data HTML table (first maxRows rows, all cols) ──
-  function buildRdRawTable(data) {
-    if (!data || data.length === 0) return '<p style="color:#64748b;padding:16px">無資料</p>';
+  // ── 生成 Raw Table（fallback 或 debug 用）────────────────────
+  function renderRdRawTable(data, title) {
+    const PLAT_KW = /intel|qualcomm|wcl|ptl|nvl|purwa|flip|marina/i;
+    const maxCols = Math.max(...data.slice(0, 50).map(r => (r||[]).length));
     const maxRows = Math.min(data.length, 60);
-    const maxCols = data.slice(0, maxRows).reduce((m, r) => Math.max(m, (r||[]).length), 0);
-    let th = '<tr><th>#</th>' + Array.from({length: maxCols}, (_, i) => `<th>${i}</th>`).join('') + '</tr>';
-    let tb = '';
+
+    let thead = '<tr><th>#</th>';
+    for (let c = 0; c < maxCols; c++) thead += `<th>${String.fromCharCode(65 + c)}</th>`;
+    thead += '</tr>';
+
+    let tbody = '';
     for (let r = 0; r < maxRows; r++) {
       const row = data[r] || [];
-      const cells = Array.from({length: maxCols}, (_, c) => `<td>${esc(String(row[c] ?? ''))}</td>`).join('');
-      tb += `<tr><th>${r}</th>${cells}</tr>`;
+      tbody += `<tr><td style="color:#475569;font-size:.7rem">${r+1}</td>`;
+      for (let c = 0; c < maxCols; c++) {
+        const v = row[c];
+        const s = String(v ?? '').trim();
+        const cls = !s ? '' : PLAT_KW.test(s) ? 'is-kw' : 'has-val';
+        tbody += `<td class="${cls}">${esc(s || '')}</td>`;
+      }
+      tbody += '</tr>';
     }
-    return `<div style="overflow:auto;max-height:500px;padding:12px 20px">
-      <table class="rd-raw-table"><thead>${th}</thead><tbody>${tb}</tbody></table>
-      ${data.length > maxRows ? `<div style="color:#64748b;font-size:.78rem;padding:8px 0">（僅顯示前 ${maxRows} 行，共 ${data.length} 行）</div>` : ''}
-    </div>`;
+
+    return `
+      <div class="debug-box">⚠️ 自動解析平台未找到資料，顯示原始表格供檢查。\n請確認：\n• 平台名稱是否包含 Intel / Qualcomm / WCL / PTL / NVL 等關鍵字\n• 工作表結構是否符合預期格式</div>
+      <div class="rd-raw-wrap">
+        <table class="rd-raw-table">
+          <thead>${thead}</thead>
+          <tbody>${tbody}</tbody>
+        </table>
+      </div>`;
+  }
+
+  // ── rdKeyword for auto-match ──────────────────────────────────
+  function rdKeyword(name) {
+    const n = (name || '').toUpperCase();
+    if (/\bWCL\b/.test(n))                            return 'WCL';
+    if (/\bPTL\b/.test(n))                            return 'PTL';
+    if (/\bNVL\b/.test(n))                            return 'NVL';
+    if (/\bPURWA\b/.test(n))                          return 'PURWA';
+    if (/\bFLIP\b/.test(n) || /\bMARINA\b/.test(n))  return 'MARINA';
+    if (/\bQUALCOMM\b/.test(n))                       return 'QUALCOMM';
+    if (/\bINTEL\b/.test(n))                          return 'INTEL';
+    // fallback: first meaningful word
+    const m = n.match(/\b([A-Z]{2,})\b/);
+    return m ? m[1] : null;
   }
 
   // ── Render ODM RD Resource ────────────────────────────────────
@@ -1363,117 +1237,109 @@
     const platsA = parseOdmRdPlatforms(data1);
     const platsB = parseOdmRdPlatforms(data2);
 
-    const failA = platsA.length === 0;
-    const failB = platsB.length === 0;
-
-    // Auto-match B platform to A platform by keyword
     const autoMatchB = (platA) => {
       const ka = rdKeyword(platA.name);
-      return platsB.findIndex(b => ka && rdKeyword(b.name) === ka);
+      if (!ka) return -1;
+      return platsB.findIndex(b => rdKeyword(b.name) === ka);
     };
 
-    // Store state globally for selector callbacks
     window._rdState = { platsA, platsB, nameA, nameB, fmtA, fmtB, data1, data2 };
 
-    // Selector options — always show something, disabled if empty
-    const selOptsA = failA
-      ? '<option disabled selected>無平台資料</option>'
-      : platsA.map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('');
-    const selOptsB = failB
-      ? '<option disabled selected>無平台資料</option>'
-      : platsB.map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('');
+    const noDataWarnA = platsA.length === 0
+      ? `<div class="debug-box" style="margin:8px 20px 0">⚠️ ${esc(nameA)} 未偵測到平台資料（格式：${fmtA}）。請切換到「原始資料」tab 確認欄位結構。</div>` : '';
+    const noDataWarnB = platsB.length === 0
+      ? `<div class="debug-box" style="margin:8px 20px 0">⚠️ ${esc(nameB)} 未偵測到平台資料（格式：${fmtB}）。請切換到「原始資料」tab 確認欄位結構。</div>` : '';
 
-    const warnA = failA ? `<div class="rd-warning">⚠️ ${esc(nameA)}（${fmtA}）解析失敗：未找到 Job function 欄或平台名稱，請查看「原始資料 A」確認格式</div>` : '';
-    const warnB = failB ? `<div class="rd-warning">⚠️ ${esc(nameB)}（${fmtB}）解析失敗：未找到 Job function 欄或平台名稱，請查看「原始資料 B」確認格式</div>` : '';
-
-    const initB = (!failA && !failB && platsA.length > 0) ? autoMatchB(platsA[0]) : 0;
+    const selOptsA = platsA.length > 0
+      ? platsA.map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('')
+      : `<option value="">（無平台資料）</option>`;
+    const selOptsB = platsB.length > 0
+      ? platsB.map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('')
+      : `<option value="">（無平台資料）</option>`;
+    const initB = platsA.length > 0 ? autoMatchB(platsA[0]) : -1;
     const initBVal = initB >= 0 ? initB : 0;
 
     const html = `
-      <div class="stats-bar">
-        <div class="stat-card"><div class="stat-number" style="color:#60a5fa">${platsA.length}</div><div class="stat-label">${esc(nameA)} 平台數（${fmtA}）</div></div>
-        <div class="stat-card"><div class="stat-number" style="color:#34d399">${platsB.length}</div><div class="stat-label">${esc(nameB)} 平台數（${fmtB}）</div></div>
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-number" style="color:${platsA.length>0?'#60a5fa':'#f87171'}">${platsA.length}</div>
+          <div class="stat-label">${esc(nameA)} 平台數<br><small style="color:#475569">${fmtA}</small></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" style="color:${platsB.length>0?'#34d399':'#f87171'}">${platsB.length}</div>
+          <div class="stat-label">${esc(nameB)} 平台數<br><small style="color:#475569">${fmtB}</small></div>
+        </div>
       </div>
       <div class="section" style="padding:0;">
-        <div class="section-title" style="padding:14px 20px 8px">📐 工作表「${esc(sheetName)}」RD Resource 比對</div>
-        ${warnA}${warnB}
-        <div class="rd-tab-bar">
-          <button class="rd-tab active" onclick="switchRdTab('compare')">📊 比對</button>
-          <button class="rd-tab" onclick="switchRdTab('rawA')">📄 原始資料 A（${esc(nameA)}）</button>
-          <button class="rd-tab" onclick="switchRdTab('rawB')">📄 原始資料 B（${esc(nameB)}）</button>
+        <div class="section-title" style="padding:14px 20px 0">📐 工作表「${esc(sheetName)}」RD Resource 比對</div>
+        <div class="rd-view-tabs">
+          <button class="rd-tab-btn active" id="rdTabCompare" onclick="switchRdView('compare')">🔍 比對模式</button>
+          <button class="rd-tab-btn" id="rdTabRawA" onclick="switchRdView('rawA')">🔵 ${esc(nameA)} 原始資料</button>
+          <button class="rd-tab-btn" id="rdTabRawB" onclick="switchRdView('rawB')">🟢 ${esc(nameB)} 原始資料</button>
         </div>
-        <div id="rdTabCompare" class="rd-tab-content active">
+        ${noDataWarnA}${noDataWarnB}
+        <div id="rdMainContent">
           <div class="rd-selector">
             <div>
               <label>🔵 ${esc(nameA)} 平台</label>
-              <select class="rd-select" id="rdSelA" onchange="updateRdComparison()" ${failA ? 'disabled' : ''}>
-                ${selOptsA}
-              </select>
+              <select class="rd-select" id="rdSelA" onchange="updateRdComparison()" ${platsA.length===0?'disabled':''}>${selOptsA}</select>
             </div>
             <div>
               <label>🟢 ${esc(nameB)} 平台</label>
-              <select class="rd-select" id="rdSelB" onchange="updateRdComparison()" ${failB ? 'disabled' : ''}>
-                ${selOptsB}
-              </select>
+              <select class="rd-select" id="rdSelB" onchange="updateRdComparison()" ${platsB.length===0?'disabled':''}>${selOptsB}</select>
             </div>
           </div>
           <div id="rdTableContainer" class="rd-table-wrap"></div>
         </div>
-        <div id="rdTabRawA" class="rd-tab-content"></div>
-        <div id="rdTabRawB" class="rd-tab-content"></div>
       </div>`;
 
     const el = document.getElementById('results');
     el.innerHTML = html;
     el.classList.remove('hidden');
 
-    // Lazy-load raw tables only when tab is first opened
-    window._rdRawBuilt = { A: false, B: false };
-
-    // Set auto-matched B selection then render comparison
     const selB = document.getElementById('rdSelB');
-    if (selB && !failB) selB.value = initBVal;
-    if (!failA && !failB) updateRdComparison();
+    if (selB && platsB.length > 0) selB.value = initBVal;
+    if (platsA.length > 0 && platsB.length > 0) updateRdComparison();
   }
 
-  // Tab switcher
-  window.switchRdTab = function(tab) {
-    const tabs    = document.querySelectorAll('.rd-tab');
-    const compare = document.getElementById('rdTabCompare');
-    const rawA    = document.getElementById('rdTabRawA');
-    const rawB    = document.getElementById('rdTabRawB');
-    [compare, rawA, rawB].forEach(el => el && el.classList.remove('active'));
-    tabs.forEach((t, i) => t.classList.toggle('active', i === ['compare','rawA','rawB'].indexOf(tab)));
-    if (tab === 'compare') compare && compare.classList.add('active');
-    if (tab === 'rawA') {
-      rawA && rawA.classList.add('active');
-      if (!window._rdRawBuilt?.A && window._rdState?.data1) {
-        rawA.innerHTML = buildRdRawTable(window._rdState.data1);
-        window._rdRawBuilt.A = true;
-      }
-    }
-    if (tab === 'rawB') {
-      rawB && rawB.classList.add('active');
-      if (!window._rdRawBuilt?.B && window._rdState?.data2) {
-        rawB.innerHTML = buildRdRawTable(window._rdState.data2);
-        window._rdRawBuilt.B = true;
-      }
+  window.switchRdView = function(mode) {
+    const { data1, data2, nameA, nameB, platsA, platsB } = window._rdState || {};
+    const content = document.getElementById('rdMainContent');
+    if (!content) return;
+
+    // Update tab buttons
+    document.querySelectorAll('.rd-tab-btn').forEach(b => b.classList.remove('active'));
+    const activeMap = { compare: 'rdTabCompare', rawA: 'rdTabRawA', rawB: 'rdTabRawB' };
+    const activeBtn = document.getElementById(activeMap[mode]);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    if (mode === 'rawA') {
+      content.innerHTML = renderRdRawTable(data1, nameA);
+    } else if (mode === 'rawB') {
+      content.innerHTML = renderRdRawTable(data2, nameB);
+    } else {
+      const selOptsA = (platsA||[]).map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('');
+      const selOptsB = (platsB||[]).map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('');
+      content.innerHTML = `
+        <div class="rd-selector">
+          <div><label>🔵 ${esc(nameA)} 平台</label>
+            <select class="rd-select" id="rdSelA" onchange="updateRdComparison()">${selOptsA}</select></div>
+          <div><label>🟢 ${esc(nameB)} 平台</label>
+            <select class="rd-select" id="rdSelB" onchange="updateRdComparison()">${selOptsB}</select></div>
+        </div>
+        <div id="rdTableContainer" class="rd-table-wrap"></div>`;
+      updateRdComparison();
     }
   };
 
-  // Called when selectors change
   window.updateRdComparison = function() {
     const { platsA, platsB, nameA, nameB } = window._rdState || {};
-    if (!platsA) return;
+    if (!platsA || !platsB) return;
     const idxA = parseInt(document.getElementById('rdSelA')?.value ?? 0);
     const idxB = parseInt(document.getElementById('rdSelB')?.value ?? 0);
     const platA = platsA[idxA];
     const platB = platsB[idxB];
-    if (!platA || !platB) {
-      const container = document.getElementById('rdTableContainer');
-      if (container) container.innerHTML = '<div class="rd-warning">⚠️ 請先確認兩側都已成功解析平台資料</div>';
-      return;
-    }
+    if (!platA || !platB) return;
 
     const FIELDS = [
       { key: 'headCounts', label: 'Head Counts' },
@@ -1486,7 +1352,6 @@
       { key: 'totalCost',  label: 'Total Cost' },
     ];
 
-    // Map rows by normalised job function
     const normJob = s => String(s ?? '').trim().toLowerCase();
     const mapA = new Map(platA.rows.map(r => [normJob(r.jobFunc), r]));
     const mapB = new Map(platB.rows.map(r => [normJob(r.jobFunc), r]));
@@ -1505,7 +1370,7 @@
       for (const { key } of FIELDS) {
         const va = ra?.[key] ?? null;
         const vb = rb?.[key] ?? null;
-        const diff = va !== vb;
+        const diff = va !== vb && !(va === null && vb === null);
         if (diff) hasDiff = true;
         cells.push(`<td class="${diff && ra && rb ? 'rd-cell-diff-a' : ''}">${esc(fmtV(va))}</td>`);
         cells.push(`<td class="${diff && ra && rb ? 'rd-cell-diff-b' : ''}">${esc(fmtV(vb))}</td>`);
@@ -1514,8 +1379,7 @@
       tbody += `<tr class="${rowCls || (hasDiff ? 'rd-row-diff' : '')}">${cells.join('')}</tr>`;
     }
 
-    // Total row
-    const tDiff = platA.totalAmt !== platB.totalAmt;
+    const tDiff = platA.totalAmt !== platB.totalAmt && !(platA.totalAmt === null && platB.totalAmt === null);
     const totalCells = [`<td><strong>Total Amount</strong></td>`];
     for (const { key } of FIELDS) {
       if (key !== 'totalCost') {
@@ -1527,13 +1391,11 @@
     }
     tbody += `<tr class="rd-total-row">${totalCells.join('')}</tr>`;
 
-    // Header
-    const subHdrs = FIELDS.map(f =>
+    const subHdrs = FIELDS.map(() =>
       `<th class="rd-th-a">${esc(nameA)}</th><th class="rd-th-b">${esc(nameB)}</th>`
     ).join('');
     const mainHdrs = FIELDS.map(f => `<th colspan="2">${esc(f.label)}</th>`).join('');
 
-    // Diff summary
     const totalDiffTxt = tDiff
       ? ` ／ Total Cost 差異：${esc(fmtV(platA.totalAmt))} vs ${esc(fmtV(platB.totalAmt))}`
       : ' ／ Total Cost 一致';
@@ -1552,8 +1414,7 @@
       ${summary}`;
   };
 
-  // ── Read revision info from "Revision" sheet ─────────────────
-  // Returns { ver, date } from the last non-empty row; col 0 = version, col 2 = date
+  // ── Read revision info ────────────────────────────────────────
   function getRevisionInfo(wb) {
     const ws = wb.Sheets['Revision'] || wb.Sheets['revision'] || wb.Sheets['REVISION'];
     if (!ws) return null;
@@ -1576,12 +1437,8 @@
 
   // ── startCompare ──────────────────────────────────────────────
   function startCompare() {
-    const sheetName  = document.getElementById('sheetSelect').value;
+    const sheetName = document.getElementById('sheetSelect').value;
     if (!sheetName || !workbooks[1] || !workbooks[2]) return;
-    // Look up actual sheet names for each workbook via sheetNameMap
-    const _map   = window._sheetNameMap?.[sheetName];
-    const name1  = _map?.wb1 ?? sheetName;
-    const name2  = _map?.wb2 ?? sheetName;
     const btn = document.getElementById('compareBtn');
     btn.disabled = true; btn.textContent = '⏳ 比對中...';
     document.getElementById('loadingEl').classList.remove('hidden');
@@ -1591,13 +1448,18 @@
       try {
         const isOdm   = isOdmIurSheet(sheetName);
         const isOdmRd = isOdmRdSheet(sheetName);
-        const data1 = (isOdm || isOdmRd) ? getRawSheetRows(workbooks[1], name1) : getSheetData(workbooks[1], name1);
-        const data2 = (isOdm || isOdmRd) ? getRawSheetRows(workbooks[2], name2) : getSheetData(workbooks[2], name2);
+
+        // RD Resource 用 wide 讀取（讀取全部欄位），IUR 用一般讀取
+        const data1 = isOdmRd ? getWideRawSheetRows(workbooks[1], sheetName)
+                    : (isOdm  ? getRawSheetRows(workbooks[1], sheetName)
+                               : getSheetData(workbooks[1], sheetName));
+        const data2 = isOdmRd ? getWideRawSheetRows(workbooks[2], sheetName)
+                    : (isOdm  ? getRawSheetRows(workbooks[2], sheetName)
+                               : getSheetData(workbooks[2], sheetName));
+
         const nameA = document.getElementById('customName1')?.value?.trim() || '檔案A';
         const nameB = document.getElementById('customName2')?.value?.trim() || '檔案B';
 
-
-        // Update revision bar
         const revA = getRevisionInfo(workbooks[1]);
         const revB = getRevisionInfo(workbooks[2]);
         const bar = document.getElementById('revisionBar');
@@ -1625,7 +1487,7 @@
         }
       } catch(err) {
         document.getElementById('loadingEl').classList.add('hidden');
-        alert('比對失敗：' + err.message);
+        alert('比對失敗：' + err.message + '\n' + err.stack);
       }
       btn.disabled = false; btn.textContent = '🔍 開始比對';
     }, 50);
@@ -1638,7 +1500,6 @@
     const LIMIT = 500;
     const totalCols = 1 + cols.length * 4;
 
-    // Dynamic headers with custom file names
     const nameA = document.getElementById('customName1')?.value?.trim() || '檔案A';
     const nameB = document.getElementById('customName2')?.value?.trim() || '檔案B';
     const th1 =
@@ -1648,9 +1509,6 @@
       `<th class="th-val-a">${esc(nameA)}</th><th class="th-val-b">${esc(nameB)}</th><th class="th-diff">差異額(A-B)</th><th class="th-pct">差異%</th>`
     ).join('');
 
-    // Pre-compute adjusted totals for NRE Summary
-    // 最終總計 = Total 行直接讀（Total 已包含 BIOS NRE 等所有項目）
-    // 獨有項目只列出供參考，不再加入計算（避免重複計算）
     let adjData = null;
     let adjExclusiveNote = '';
     if (isNreSummary) {
@@ -1658,16 +1516,12 @@
       if (totalRow) {
         const addedRows   = rows.filter(r => r.type === 'added');
         const removedRows = rows.filter(r => r.type === 'removed');
-
-        // 最終總計 = Total 直接使用，不加獨有項目
         adjData = cols.map((_, i) => {
           const adjA = totalRow.colData[i].vA.num ?? 0;
           const adjB = totalRow.colData[i].vB.num ?? 0;
           const { diff, pct } = calcDiff(adjA, adjB);
           return { adjA, adjB, diff, pct };
         });
-
-        // 組合獨有項目說明文字
         const aOnly = removedRows.map(r => r.key).join('、');
         const bOnly = addedRows.map(r => r.key).join('、');
         const parts = [];
@@ -1679,7 +1533,6 @@
 
     const dir = d => d === null ? '' : d > 0 ? ' diff-up' : d < 0 ? ' diff-down' : ' diff-zero';
 
-    // Rows (for-loop so we can inject adjusted total after Total row)
     let evenIdx = 0;
     const tbodyParts = [];
     for (const row of rows.slice(0, LIMIT)) {
@@ -1692,7 +1545,6 @@
       const evenCls  = (evenIdx++ % 2 === 1) ? ' row-even' : '';
 
       const colCells = row.colData.map(col => {
-        // NRE Summary: for exclusive rows treat missing side as 0 and recalculate diff/pct
         let effDiff = col.diff, effPct = col.pct;
         let aDisplay = fmtNum(col.vA.raw);
         let bDisplay = fmtNum(col.vB.raw);
@@ -1700,7 +1552,7 @@
           const nA = col.vA.num ?? 0;
           const nB = col.vB.num ?? 0;
           effDiff = nA - nB;
-          effPct  = nB !== 0 ? (effDiff / Math.abs(nB)) * 100 : null; // div-by-zero → blank
+          effPct  = nB !== 0 ? (effDiff / Math.abs(nB)) * 100 : null;
           if (row.type === 'added')   aDisplay = '0';
           if (row.type === 'removed') bDisplay = '0';
         }
@@ -1716,10 +1568,8 @@
         <td class="${itemCls}" title="${esc(row.key)}">${esc(row.key)}</td>
         ${colCells}
       </tr>`);
-
     }
 
-    // Append separator + 最終總計 at the very bottom (after BIOS NRE and all exclusive rows)
     if (adjData) {
       const finalCells = adjData.map(d =>
         `<td class="td-a">${esc(fmtNumOdm(d.adjA))}</td>` +
@@ -1741,7 +1591,6 @@
     }
 
     let tbody = tbodyParts.join('');
-
     if (rows.length === 0) {
       tbody = `<tr><td colspan="${totalCols}" class="truncate-notice">（此工作表無可比對的 Item 資料）</td></tr>`;
     } else if (rows.length > LIMIT) {
@@ -1756,12 +1605,10 @@
         <div class="stat-card"><div class="stat-number" style="color:#34d399">${added.length}</div><div class="stat-label">${esc(nameB)} 獨有</div></div>
         <div class="stat-card"><div class="stat-number" style="color:#60a5fa">${total}</div><div class="stat-label">總差異數</div></div>
       </div>
-
       <div class="section">
         <div class="section-title">🤖 差異摘要 <span class="badge badge-ai">自動分析</span></div>
         <div id="aiContent"></div>
       </div>
-
       <div class="section" style="padding:16px 20px;">
         <div class="section-title">
           📋 工作表「${esc(sheetName)}」比對結果
@@ -1782,15 +1629,11 @@
         </div>
         <div class="compare-wrap">
           <table class="compare-table" id="compareTable">
-            <thead>
-              <tr>${th1}</tr>
-              <tr>${th2}</tr>
-            </thead>
+            <thead><tr>${th1}</tr><tr>${th2}</tr></thead>
             <tbody>${tbody}</tbody>
           </table>
         </div>
-      </div>
-    `;
+      </div>`;
 
     const el = document.getElementById('results');
     el.innerHTML = html;
@@ -1828,7 +1671,6 @@
       });
       s += '\n';
     }
-
     if (removed.length > 0) {
       s += `⚠️ 僅 ${nameA} 有的 Item（共 ${removed.length} 個）\n`;
       removed.slice(0, 8).forEach(item => {
@@ -1838,7 +1680,6 @@
       if (removed.length > 8) s += `• … 還有 ${removed.length - 8} 個\n`;
       s += '\n';
     }
-
     if (added.length > 0) {
       s += `✅ 僅 ${nameB} 有的 Item（共 ${added.length} 個）\n`;
       added.slice(0, 8).forEach(item => {
@@ -1849,26 +1690,19 @@
       s += '\n';
     }
 
-    // NRE Summary：含獨有項目的最終總成本比較
     if (isNreSummary) {
       const totalRow = rows.find(r => /^total\b/i.test(r.key.trim()) || /^grand\s+total/i.test(r.key.trim()));
       if (totalRow && cols.length > 0) {
         const addedRows   = rows.filter(r => r.type === 'added');
         const removedRows = rows.filter(r => r.type === 'removed');
-        s += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
-        s += '🏁 最終總成本比較（含所有獨有項目）\n';
-        s += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+        s += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🏁 最終總成本比較（含所有獨有項目）\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
         cols.forEach((col, i) => {
-          const adjA = (totalRow.colData[i].vA.num ?? 0)
-            + removedRows.reduce((acc, r) => acc + (r.colData[i].vA.num ?? 0), 0);
-          const adjB = (totalRow.colData[i].vB.num ?? 0)
-            + addedRows.reduce((acc, r) => acc + (r.colData[i].vB.num ?? 0), 0);
+          const adjA = (totalRow.colData[i].vA.num ?? 0) + removedRows.reduce((acc, r) => acc + (r.colData[i].vA.num ?? 0), 0);
+          const adjB = (totalRow.colData[i].vB.num ?? 0) + addedRows.reduce((acc, r) => acc + (r.colData[i].vB.num ?? 0), 0);
           const diff = adjA - adjB;
           const pct  = adjB !== 0 ? (diff / Math.abs(adjB)) * 100 : null;
           if (cols.length > 1) s += `▸ ${col.label}\n`;
-          s += `  ${nameA} 最終總成本：$${fmtNumOdm(adjA)}\n`;
-          s += `  ${nameB} 最終總成本：$${fmtNumOdm(adjB)}\n`;
-          s += `  總差異：${fmtDiff(diff)}（${fmtPct(pct)}）\n`;
+          s += `  ${nameA} 最終總成本：$${fmtNumOdm(adjA)}\n  ${nameB} 最終總成本：$${fmtNumOdm(adjB)}\n  總差異：${fmtDiff(diff)}（${fmtPct(pct)}）\n`;
         });
         s += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
       }
