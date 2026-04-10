@@ -495,29 +495,56 @@
     if (!workbooks[1] || !workbooks[2]) return;
     const s1 = workbooks[1].SheetNames;
     const s2 = workbooks[2].SheetNames;
-    const common = s1.filter(s => s2.includes(s));
-    const aOnly  = s1.filter(s => !s2.includes(s));
-    const bOnly  = s2.filter(s => !s1.includes(s));
+    const nameA = document.getElementById('customName1')?.value?.trim() || '檔案A';
+    const nameB = document.getElementById('customName2')?.value?.trim() || '檔案B';
+
+    // Build sheetNameMap { s1Name → s2Name }:
+    //   1. Exact match first
+    //   2. Case-insensitive match for remaining (e.g. "ODM RD resource" ↔ "ODM RD Resource")
+    const sheetNameMap = {};
+    const usedS2 = new Set();
+
+    for (const n of s1) {
+      if (s2.includes(n)) { sheetNameMap[n] = n; usedS2.add(n); }
+    }
+    for (const n of s1) {
+      if (sheetNameMap[n]) continue;
+      const match = s2.find(n2 => !usedS2.has(n2) && n.toLowerCase() === n2.toLowerCase());
+      if (match) { sheetNameMap[n] = match; usedS2.add(match); }
+    }
+    window._sheetNameMap = sheetNameMap;
+
+    const common   = Object.keys(sheetNameMap);            // s1 names with any match
+    const aOnly    = s1.filter(n => !sheetNameMap[n]);
+    const bOnly    = s2.filter(n2 => !usedS2.has(n2));
+    const s2Common = common.map(n => sheetNameMap[n]);     // corresponding s2 names
 
     const chips = (arr, cls) => arr.map(s => `<span class="sheet-chip ${cls}">${esc(s)}</span>`).join('');
     document.getElementById('sheetSummaryInner').innerHTML = `
       <div class="sheet-group">
         <span class="sheet-group-label">📁 檔案 A（${s1.length} 個工作表）</span>
-        ${chips(s1.filter(s => common.includes(s)), 'chip-common')}
+        ${chips(common, 'chip-common')}
         ${chips(aOnly, 'chip-a-only')}
       </div>
       <div class="sheet-group">
         <span class="sheet-group-label">📁 檔案 B（${s2.length} 個工作表）</span>
-        ${chips(s2.filter(s => common.includes(s)), 'chip-common')}
+        ${chips(s2Common, 'chip-common')}
         ${chips(bOnly, 'chip-b-only')}
       </div>
-      ${aOnly.length > 0 ? `<div class="sheet-note sheet-note-red">⚠️ 僅 ${esc(document.getElementById('customName1')?.value?.trim()||'檔案A')} 有：${aOnly.map(esc).join('、')}</div>` : ''}
-      ${bOnly.length > 0 ? `<div class="sheet-note sheet-note-green">✅ 僅 ${esc(document.getElementById('customName2')?.value?.trim()||'檔案B')} 有：${bOnly.map(esc).join('、')}</div>` : ''}
-      ${common.length === 0 ? '<div class="sheet-note sheet-note-red">❌ 兩個檔案沒有共同工作表，無法比對</div>' : `<div class="sheet-note" style="color:#a78bfa;background:rgba(139,92,246,.1)">✔ 共同工作表：${common.length} 個</div>`}
+      ${aOnly.length > 0 ? `<div class="sheet-note sheet-note-red">⚠️ 僅 ${esc(nameA)} 有：${aOnly.map(esc).join('、')}</div>` : ''}
+      ${bOnly.length > 0 ? `<div class="sheet-note sheet-note-green">✅ 僅 ${esc(nameB)} 有：${bOnly.map(esc).join('、')}</div>` : ''}
+      ${common.length === 0
+        ? '<div class="sheet-note sheet-note-red">❌ 兩個檔案沒有共同工作表，無法比對</div>'
+        : `<div class="sheet-note" style="color:#a78bfa;background:rgba(139,92,246,.1)">✔ 共同工作表：${common.length} 個</div>`}
     `;
     document.getElementById('sheetSummaryEl').classList.remove('hidden');
     const sel = document.getElementById('sheetSelect');
-    sel.innerHTML = common.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+    // Dropdown value = s1 name; label notes when s2 name differs
+    sel.innerHTML = common.map(n => {
+      const n2 = sheetNameMap[n];
+      const label = n === n2 ? n : `${n}  (B: ${n2})`;
+      return `<option value="${esc(n)}">${esc(label)}</option>`;
+    }).join('');
     document.getElementById('sheetSelectorEl').classList.toggle('hidden', common.length === 0);
     document.getElementById('compareBtn').disabled = common.length === 0;
   }
@@ -1594,8 +1621,10 @@
 
   // ── startCompare ──────────────────────────────────────────────
   function startCompare() {
-    const sheetName = document.getElementById('sheetSelect').value;
+    const sheetName  = document.getElementById('sheetSelect').value;
     if (!sheetName || !workbooks[1] || !workbooks[2]) return;
+    // sheetName is always the s1 (file A) name; look up the corresponding s2 (file B) name
+    const sheetName2 = window._sheetNameMap?.[sheetName] ?? sheetName;
     const btn = document.getElementById('compareBtn');
     btn.disabled = true; btn.textContent = '⏳ 比對中...';
     document.getElementById('loadingEl').classList.remove('hidden');
@@ -1605,8 +1634,8 @@
       try {
         const isOdm   = isOdmIurSheet(sheetName);
         const isOdmRd = isOdmRdSheet(sheetName);
-        const data1 = (isOdm || isOdmRd) ? getRawSheetRows(workbooks[1], sheetName) : getSheetData(workbooks[1], sheetName);
-        const data2 = (isOdm || isOdmRd) ? getRawSheetRows(workbooks[2], sheetName) : getSheetData(workbooks[2], sheetName);
+        const data1 = (isOdm || isOdmRd) ? getRawSheetRows(workbooks[1], sheetName)  : getSheetData(workbooks[1], sheetName);
+        const data2 = (isOdm || isOdmRd) ? getRawSheetRows(workbooks[2], sheetName2) : getSheetData(workbooks[2], sheetName2);
         const nameA = document.getElementById('customName1')?.value?.trim() || '檔案A';
         const nameB = document.getElementById('customName2')?.value?.trim() || '檔案B';
 
