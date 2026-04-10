@@ -484,9 +484,17 @@
     if (!workbooks[1] || !workbooks[2]) return;
     const s1 = workbooks[1].SheetNames;
     const s2 = workbooks[2].SheetNames;
-    const common = s1.filter(s => s2.includes(s));
-    const aOnly  = s1.filter(s => !s2.includes(s));
-    const bOnly  = s2.filter(s => !s1.includes(s));
+    const s1low = s1.map(s => s.trim().toLowerCase());
+    const s2low = s2.map(s => s.trim().toLowerCase());
+    // Build name map: normalized name -> actual names in each file
+    window._sheetNameMap = {};
+    s1low.forEach((low, i) => {
+      const j = s2low.indexOf(low);
+      if (j >= 0) window._sheetNameMap[low] = { s1: s1[i], s2: s2[j] };
+    });
+    const common = s1.filter((s, i) => s2low.includes(s1low[i]));
+    const aOnly  = s1.filter((s, i) => !s2low.includes(s1low[i]));
+    const bOnly  = s2.filter((s, j) => !s1low.includes(s2low[j]));
 
     const chips = (arr, cls) => arr.map(s => `<span class="sheet-chip ${cls}">${esc(s)}</span>`).join('');
     document.getElementById('sheetSummaryInner').innerHTML = `
@@ -1042,102 +1050,144 @@
   //   4. 垂直堆疊（同一群組多個平台）自然處理
   // ══════════════════════════════════════════════════════════════
   function parseOdmRdPlatforms(data) {
-    const PLAT_KW = /intel|qualcomm|wcl|ptl|nvl|purwa|flip|marina/i;
+    const PLAT_KW       = /intel|qualcomm|wcl|ptl|nvl|purwa|flip|marina/i;
     const TOTAL_COST_KW = /total\s*cost\s*amount|total\s*cost/i;
-    const JOB_FUNC_KW = /^job\s*(function|func)/i;
-    const TOTAL_AMT_KW = /^total\s*(amount|amt)/i;
-    const RD_WAVE_KW = /^rd\s*resource/i;
-    const EXCLUDE_KW = /same as intel|same as above|refer to|note:|remark/i;
+    const JOB_FUNC_KW   = /^job\s*(function|func)/i;
+    const TOTAL_AMT_KW  = /^total\s*(amount|amt)/i;
+    const RD_WAVE_KW    = /^rd\s*resource/i;
+    const EXCLUDE_KW    = /same as intel|same as above|refer to|note:|remark/i;
+
     const platforms = [];
+
+    // Auto-detect HQ style: col 0 has "RD resource - WaveN" as section header
     let isHqStyle = false;
     for (let r = 0; r < data.length; r++) {
-      const row = data[r] || [];
-      const s0 = String(row[0] !== null && row[0] !== undefined ? row[0] : '').trim();
+      const s0 = String(data[r] && data[r][0] != null ? data[r][0] : '').trim();
       if (RD_WAVE_KW.test(s0)) { isHqStyle = true; break; }
     }
+
     if (isHqStyle) {
+      // HQ style: each "RD resource - WaveN" row starts a new platform section
       for (let r = 0; r < data.length; r++) {
         const row = data[r] || [];
-        const s0 = String(row[0] !== null && row[0] !== undefined ? row[0] : '').trim();
+        const s0 = String(row[0] != null ? row[0] : '').trim();
         if (!RD_WAVE_KW.test(s0)) continue;
+
+        // Find platform name in this row (not col 0)
         let platName = s0;
         for (let c = 1; c < row.length; c++) {
-          const v = String(row[c] !== null && row[c] !== undefined ? row[c] : '').trim();
+          const v = String(row[c] != null ? row[c] : '').trim();
           if (v && PLAT_KW.test(v) && !EXCLUDE_KW.test(v)) { platName = v; break; }
         }
+
+        // Field header row = r+1
         const fhr = r + 1;
         const fhrRow = data[fhr] || [];
         let fo = { headCounts:1, senior:2, seniorCost:3, junior:4, juniorCost:5, dedication:6, timeLen:7, totalCost:8 };
         for (let c = 1; c < fhrRow.length; c++) {
-          const v = String(fhrRow[c] !== null && fhrRow[c] !== undefined ? fhrRow[c] : '').trim().toLowerCase();
-          if (/total.*cost|cost.*amount/i.test(v)) fo.totalCost = c;
-          else if (/head.*count|total.*head/i.test(v)) fo.headCounts = c;
-          else if (/senior.*cost|cost.*senior/i.test(v)) fo.seniorCost = c;
-          else if (/junior.*cost|cost.*junior/i.test(v)) fo.juniorCost = c;
-          else if (/^senior/i.test(v)) fo.senior = c;
-          else if (/^junior/i.test(v)) fo.junior = c;
-          else if (/dedic/i.test(v)) fo.dedication = c;
-          else if (/time|month/i.test(v)) fo.timeLen = c;
+          const v = String(fhrRow[c] != null ? fhrRow[c] : '').trim().toLowerCase();
+          const off = c;
+          if (/total.*cost|cost.*amount/i.test(v))       fo.totalCost  = off;
+          else if (/head.*count|total.*head/i.test(v))   fo.headCounts = off;
+          else if (/senior.*cost|cost.*senior/i.test(v)) fo.seniorCost = off;
+          else if (/junior.*cost|cost.*junior/i.test(v)) fo.juniorCost = off;
+          else if (/^senior/i.test(v))                   fo.senior     = off;
+          else if (/^junior/i.test(v))                   fo.junior     = off;
+          else if (/dedic/i.test(v))                     fo.dedication = off;
+          else if (/time|month/i.test(v))                fo.timeLen    = off;
         }
+
         const rows = [];
         let totalAmt = null;
         for (let dr = fhr + 1; dr < data.length; dr++) {
           const drow = data[dr] || [];
-          const jobFunc = String(drow[0] !== null && drow[0] !== undefined ? drow[0] : '').trim();
+          const jobFunc = String(drow[0] != null ? drow[0] : '').trim();
           if (!jobFunc) continue;
           if (RD_WAVE_KW.test(jobFunc)) break;
           if (JOB_FUNC_KW.test(jobFunc)) continue;
-          if (TOTAL_AMT_KW.test(jobFunc)) { totalAmt = parseNum(drow[fo.totalCost]); break; }
-          rows.push({ jobFunc, headCounts: parseNum(drow[fo.headCounts]), senior: parseNum(drow[fo.senior]), seniorCost: parseNum(drow[fo.seniorCost]), junior: parseNum(drow[fo.junior]), juniorCost: parseNum(drow[fo.juniorCost]), dedication: parseNum(drow[fo.dedication]), timeLen: parseNum(drow[fo.timeLen]), totalCost: parseNum(drow[fo.totalCost]) });
+          if (TOTAL_AMT_KW.test(jobFunc)) {
+            totalAmt = parseNum(drow[fo.totalCost]);
+            break;
+          }
+          rows.push({
+            jobFunc,
+            headCounts: parseNum(drow[fo.headCounts]),
+            senior:     parseNum(drow[fo.senior]),
+            seniorCost: parseNum(drow[fo.seniorCost]),
+            junior:     parseNum(drow[fo.junior]),
+            juniorCost: parseNum(drow[fo.juniorCost]),
+            dedication: parseNum(drow[fo.dedication]),
+            timeLen:    parseNum(drow[fo.timeLen]),
+            totalCost:  parseNum(drow[fo.totalCost]),
+          });
         }
         if (rows.length > 0 || totalAmt !== null) platforms.push({ name: platName, rows, totalAmt });
       }
+
     } else {
+      // Wistron style: platform name at endCol when startCol is empty
       const endCols = new Set();
       for (let r = 0; r < Math.min(data.length, 10); r++) {
         const row = data[r] || [];
         for (let c = 0; c < row.length; c++) {
-          if (TOTAL_COST_KW.test(String(row[c] !== null && row[c] !== undefined ? row[c] : '').trim())) endCols.add(c);
+          if (TOTAL_COST_KW.test(String(row[c] != null ? row[c] : '').trim())) endCols.add(c);
         }
       }
       if (endCols.size === 0) endCols.add(8);
+
       for (const endCol of [...endCols].sort((a, b) => a - b)) {
         const startCol = endCol - 8;
         if (startCol < 0) continue;
-        let currentPlat = null, inData = false;
+        let currentPlat = null;
+        let inData = false;
         let fo = { headCounts:1, senior:2, seniorCost:3, junior:4, juniorCost:5, dedication:6, timeLen:7, totalCost:8 };
         for (let r = 0; r < data.length; r++) {
           const row = data[r] || [];
-          const s0 = String(row[startCol] !== null && row[startCol] !== undefined ? row[startCol] : '').trim();
-          const sE = String(row[endCol] !== null && row[endCol] !== undefined ? row[endCol] : '').trim();
+          const s0 = String(row[startCol] != null ? row[startCol] : '').trim();
+          const sE = String(row[endCol]   != null ? row[endCol]   : '').trim();
           if (!s0 && PLAT_KW.test(sE) && !EXCLUDE_KW.test(sE)) {
             if (currentPlat && (currentPlat.rows.length > 0 || currentPlat.totalAmt !== null)) platforms.push(currentPlat);
-            currentPlat = { name: sE, rows: [], totalAmt: null }; inData = false; continue;
+            currentPlat = { name: sE, rows: [], totalAmt: null };
+            inData = false; continue;
           }
           if (!currentPlat) continue;
           if (JOB_FUNC_KW.test(s0)) {
             fo = { headCounts:1, senior:2, seniorCost:3, junior:4, juniorCost:5, dedication:6, timeLen:7, totalCost:8 };
             for (let c = startCol + 1; c <= endCol; c++) {
-              const v = String(row[c] !== null && row[c] !== undefined ? row[c] : '').trim().toLowerCase();
+              const v = String(row[c] != null ? row[c] : '').trim().toLowerCase();
               const off = c - startCol;
-              if (/total.*cost|cost.*amount/i.test(v)) fo.totalCost = off;
-              else if (/head.*count|total.*head/i.test(v)) fo.headCounts = off;
+              if (/total.*cost|cost.*amount/i.test(v))       fo.totalCost  = off;
+              else if (/head.*count|total.*head/i.test(v))   fo.headCounts = off;
               else if (/senior.*cost|cost.*senior/i.test(v)) fo.seniorCost = off;
               else if (/junior.*cost|cost.*junior/i.test(v)) fo.juniorCost = off;
-              else if (/^senior/i.test(v)) fo.senior = off;
-              else if (/^junior/i.test(v)) fo.junior = off;
-              else if (/dedic/i.test(v)) fo.dedication = off;
-              else if (/time|month/i.test(v)) fo.timeLen = off;
+              else if (/^senior/i.test(v))                   fo.senior     = off;
+              else if (/^junior/i.test(v))                   fo.junior     = off;
+              else if (/dedic/i.test(v))                     fo.dedication = off;
+              else if (/time|month/i.test(v))                fo.timeLen    = off;
             }
             inData = true; continue;
           }
           if (!inData) continue;
-          if (TOTAL_AMT_KW.test(s0)) { currentPlat.totalAmt = parseNum(row[startCol + fo.totalCost]); inData = false; continue; }
-          if (s0) currentPlat.rows.push({ jobFunc: s0, headCounts: parseNum(row[startCol + fo.headCounts]), senior: parseNum(row[startCol + fo.senior]), seniorCost: parseNum(row[startCol + fo.seniorCost]), junior: parseNum(row[startCol + fo.junior]), juniorCost: parseNum(row[startCol + fo.juniorCost]), dedication: parseNum(row[startCol + fo.dedication]), timeLen: parseNum(row[startCol + fo.timeLen]), totalCost: parseNum(row[startCol + fo.totalCost]) });
+          if (TOTAL_AMT_KW.test(s0)) {
+            currentPlat.totalAmt = parseNum(row[startCol + fo.totalCost]);
+            inData = false; continue;
+          }
+          if (s0) currentPlat.rows.push({
+            jobFunc: s0,
+            headCounts: parseNum(row[startCol + fo.headCounts]),
+            senior:     parseNum(row[startCol + fo.senior]),
+            seniorCost: parseNum(row[startCol + fo.seniorCost]),
+            junior:     parseNum(row[startCol + fo.junior]),
+            juniorCost: parseNum(row[startCol + fo.juniorCost]),
+            dedication: parseNum(row[startCol + fo.dedication]),
+            timeLen:    parseNum(row[startCol + fo.timeLen]),
+            totalCost:  parseNum(row[startCol + fo.totalCost]),
+          });
         }
         if (currentPlat && (currentPlat.rows.length > 0 || currentPlat.totalAmt !== null)) platforms.push(currentPlat);
       }
     }
+
     return platforms;
   }
   // ── 生成 Raw Table（fallback 或 debug 用）────────────────────
@@ -1407,13 +1457,19 @@
         const isOdm   = isOdmIurSheet(sheetName);
         const isOdmRd = isOdmRdSheet(sheetName);
 
+        // Use sheetNameMap to get actual sheet name in each file (handles case mismatch)
+        const sheetLow = sheetName.trim().toLowerCase();
+        const map = (window._sheetNameMap && window._sheetNameMap[sheetLow]) || {};
+        const sheetName1 = map.s1 || sheetName;
+        const sheetName2 = map.s2 || sheetName;
+
         // RD Resource 用 wide 讀取（讀取全部欄位），IUR 用一般讀取
-        const data1 = isOdmRd ? getWideRawSheetRows(workbooks[1], sheetName)
-                    : (isOdm  ? getRawSheetRows(workbooks[1], sheetName)
-                               : getSheetData(workbooks[1], sheetName));
-        const data2 = isOdmRd ? getWideRawSheetRows(workbooks[2], sheetName)
-                    : (isOdm  ? getRawSheetRows(workbooks[2], sheetName)
-                               : getSheetData(workbooks[2], sheetName));
+        const data1 = isOdmRd ? getWideRawSheetRows(workbooks[1], sheetName1)
+                    : (isOdm  ? getRawSheetRows(workbooks[1], sheetName1)
+                               : getSheetData(workbooks[1], sheetName1));
+        const data2 = isOdmRd ? getWideRawSheetRows(workbooks[2], sheetName2)
+                    : (isOdm  ? getRawSheetRows(workbooks[2], sheetName2)
+                               : getSheetData(workbooks[2], sheetName2));
 
         const nameA = document.getElementById('customName1')?.value?.trim() || '檔案A';
         const nameB = document.getElementById('customName2')?.value?.trim() || '檔案B';
