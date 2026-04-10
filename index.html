@@ -1283,10 +1283,21 @@
         const row = data[r] || [];
         const s0 = String(row[startCol] ?? '').trim();
         const sE = String(row[endCol]   ?? '').trim();
-        if (!s0 && PLAT_KW.test(sE)) {
+        const EXCLUDE_KW = /same as intel|same as above|refer to|note:|remark/i;
+        // Wistron-style: startCol empty, endCol has platform keyword
+        if (!s0 && PLAT_KW.test(sE) && !EXCLUDE_KW.test(sE)) {
           if (currentPlat && (currentPlat.rows.length > 0 || currentPlat.totalAmt !== null)) platforms.push(currentPlat);
           currentPlat = { name: sE, rows: [], totalAmt: null };
           inData = false; continue;
+        }
+        // HQ-style: startCol has platform keyword, middle cols (1-7) all empty
+        if (PLAT_KW.test(s0) && !JOB_FUNC_KW.test(s0) && !TOTAL_AMT_KW.test(s0) && !EXCLUDE_KW.test(s0)) {
+          const midEmpty = [1,2,3,4,5,6].every(off => !String(row[startCol+off] ?? '').trim());
+          if (midEmpty) {
+            if (currentPlat && (currentPlat.rows.length > 0 || currentPlat.totalAmt !== null)) platforms.push(currentPlat);
+            currentPlat = { name: s0, rows: [], totalAmt: null };
+            inData = false; continue;
+          }
         }
         if (!currentPlat) continue;
         if (JOB_FUNC_KW.test(s0)) {
