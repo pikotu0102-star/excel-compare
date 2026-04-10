@@ -1054,7 +1054,7 @@
     const TOTAL_COST_KW = /total\s*cost\s*amount|total\s*cost/i;
     const JOB_FUNC_KW   = /^job\s*(function|func)/i;
     const TOTAL_AMT_KW  = /^total\s*(amount|amt)/i;
-    const RD_WAVE_KW    = /^rd\s*resource/i;
+    const RD_WAVE_KW    = /^rd\s*resource\s*[-\u2013]/i;  // HQ: 'RD resource - Wave1' (has dash)
     const EXCLUDE_KW    = /same as intel|same as above|refer to|note:|remark/i;
 
     const platforms = [];
