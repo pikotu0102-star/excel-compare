@@ -858,19 +858,15 @@
         continue;
       }
       if (s0) {
-        if (s0.includes('Free Sample') || s0.includes('ODM IUR')) {
-          console.warn('[Wistron] Intel 異常行未被 SKIP_0 過濾，row' + r + ':', s0, '→ 排除');
-        } else {
-          cur.items.push({
-            platform:  s0,
-            qtyWhq:    parseNum(row[1]),
-            qtyWcq:    parseNum(row[2]),
-            up:        parseNum(row[3]),
-            subAmtWhq: parseNum(row[4]),
-            subAmtWcq: parseNum(row[5]),
-            totalAmt:  parseNum(row[6]),
-          });
-        }
+        cur.items.push({
+          platform:  s0,
+          qtyWhq:    parseNum(row[1]),
+          qtyWcq:    parseNum(row[2]),
+          up:        parseNum(row[3]),
+          subAmtWhq: parseNum(row[4]),
+          subAmtWcq: parseNum(row[5]),
+          totalAmt:  parseNum(row[6]),
+        });
       }
     }
 
@@ -902,6 +898,18 @@
     const qcTotalCol = qcomHdrColW;
     console.log('[Wistron] Qualcomm Platform 欄: col' + qcPlatCol + '  Total 欄: col' + qcTotalCol);
 
+    // ── 診斷：掃描 row97+ 找 Free Sample 或 35000 ──
+    console.log('=== Wistron Qualcomm 診斷掃描（row97+）===');
+    data.forEach((row, i) => {
+      if (i < 97) return;
+      if (row[8] && String(row[8]).toLowerCase().includes('free')) {
+        console.log(`Qualcomm Free Sample row${i}: col8=${row[8]}, col14=${row[14]}, col15=${row[15]}`);
+      }
+      if (row[14] === 35000 || row[15] === 35000) {
+        console.log(`Qualcomm 35000 at row${i}: col8=${row[8]}, col9=${row[9]}, col14=${row[14]}, col15=${row[15]}`);
+      }
+    });
+
     let curQ = null;
 
     for (let r = 0; r < data.length; r++) {
@@ -926,9 +934,9 @@
         curQ.subtotalAmt    = row[qcTotalCol];
         continue;
       }
-      // 資料行：Platform 欄有值
+      // 資料行：Platform 欄有值（全部加入 items，含 Free Sample；過濾在 subtotalAmt 計算時處理）
       if (s9) {
-        const qcItem = {
+        curQ.items.push({
           platform:  s9,
           qtyWhq:    parseNum(row[qcPlatCol + 1]),
           qtyWcq:    parseNum(row[qcPlatCol + 2]),
@@ -936,12 +944,7 @@
           subAmtWhq: parseNum(row[qcTotalCol - 2]),
           subAmtWcq: parseNum(row[qcTotalCol - 1]),
           totalAmt:  parseNum(row[qcTotalCol]),
-        };
-        if (s9.includes('Free Sample') || s9.includes('ODM IUR')) {
-          console.warn('[Wistron] Qualcomm 異常行未被 SKIP_9 過濾，row' + r + ':', s9, 'totalAmt:', qcItem.totalAmt, '→ 排除');
-        } else {
-          curQ.items.push(qcItem);
-        }
+        });
       }
     }
     const qcomBlocksW = blocks.filter(b => b.chipset === 'qcom');
