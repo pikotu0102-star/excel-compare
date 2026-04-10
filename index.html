@@ -1226,20 +1226,22 @@
   }
 
   // Detect HQ vs Wistron for RD resource sheet — scan first 15 rows
-  // Wistron: any cell contains "RD resource"
-  // HQ:      any single row has 2+ cells matching platform keywords
   function detectOdmRdFormat(data) {
-    const limit = Math.min(data.length, 15);
-    const platKw = /intel|qualcomm|wcl|ptl|nvl|purwa|flip|marina/i;
-    for (let r = 0; r < limit; r++) {
+    const PLAT_KW = /intel|qualcomm|wcl|ptl|nvl|purwa|flip|marina/i;
+    const RD_KW   = /rd\s*resource/i;
+    for (let r = 0; r < Math.min(data.length, 15); r++) {
       const row = data[r] || [];
-      if (row.some(c => /rd\s*resource/i.test(String(c ?? '')))) return 'wistron';
+      for (let c = 0; c < row.length; c++) {
+        if (RD_KW.test(String(row[c] ?? '').trim())) return 'wistron';
+      }
     }
-    for (let r = 0; r < limit; r++) {
+    for (let r = 0; r < Math.min(data.length, 15); r++) {
       const row = data[r] || [];
-      const hits = row.filter(c => platKw.test(String(c ?? ''))).length;
-      if (hits >= 2) return 'hq';
+      let n = 0;
+      for (let c = 0; c < row.length; c++) if (PLAT_KW.test(String(row[c] ?? '').trim())) n++;
+      if (n >= 2) return 'hq';
     }
+    if ((data[0]||[]).some(v => PLAT_KW.test(String(v ?? '')))) return 'hq';
     return 'unknown';
   }
 
@@ -1255,202 +1257,73 @@
     return null;
   }
 
-  // Parse platforms from RD resource sheet — dynamic column detection
-  // Returns [{ name, rows:[{jobFunc,headCounts,senior,seniorCost,junior,juniorCost,dedication,timeLen,totalCost}], totalAmt }]
-  function parseOdmRdPlatforms(data, fmt) {
-    const platforms = [];
-    const limit15 = Math.min(data.length, 15);
-    const platKw  = /intel|qualcomm|wcl|ptl|nvl|purwa|flip|marina/i;
-    const colHdrKw = /head\s*count|total\s*head|senior|junior|dedication|total\s*(cost|amount)/i;
+  function parseOdmRdPlatforms(data) {
+    const PLAT_KW       = /intel|qualcomm|wcl|ptl|nvl|purwa|flip|marina/i;
+    const TOTAL_COST_KW = /total\s*cost\s*amount|total\s*cost/i;
+    const JOB_FUNC_KW   = /^job\s*(function|func)/i;
+    const TOTAL_AMT_KW  = /^total\s*(amount)?/i;
 
-    let platHdrRowIdx = -1;  // row with 2+ platform name cells (HQ only)
-    let hdrRowIdx     = -1;  // row with column labels (Job function / Head counts…)
-    let groupStartCols = []; // columns where each platform group begins
-
-    if (fmt === 'hq') {
-      // ── HQ Step 1: find the platform header row (2+ cells with platform keywords) ──
-      for (let r = 0; r < limit15; r++) {
-        const row = data[r] || [];
-        const platCols = [];
-        for (let c = 0; c < row.length; c++) {
-          if (platKw.test(String(row[c] ?? ''))) platCols.push(c);
-        }
-        if (platCols.length >= 2) { platHdrRowIdx = r; groupStartCols = platCols; break; }
+    const endCols = new Set();
+    for (let r = 0; r < Math.min(data.length, 10); r++) {
+      const row = data[r] || [];
+      for (let c = 0; c < row.length; c++) {
+        if (TOTAL_COST_KW.test(String(row[c] ?? '').trim())) endCols.add(c);
       }
-      if (platHdrRowIdx < 0) return platforms;
-
-      // ── HQ Step 2: find the column header row (3+ column label matches) after platHdrRowIdx ──
-      for (let r = platHdrRowIdx + 1; r < Math.min(data.length, platHdrRowIdx + 10); r++) {
-        const row = data[r] || [];
-        if (row.filter(c => colHdrKw.test(String(c ?? ''))).length >= 3) { hdrRowIdx = r; break; }
-      }
-      if (hdrRowIdx < 0) return platforms;
-
-    } else {
-      // ══ Wistron: platforms are VERTICALLY stacked ══
-      // Platform header row: col0 empty (or "RD resource") AND col8 has platKw
-      //   Group A (Intel):    nameCol = 8,  startCol = 0
-      //   Group B (Qualcomm): nameCol = 9+, startCol = nameCol - 8
-      // From platform header row, scan downward for "Job function" header row.
-      // Data rows follow Job function row until "Total amount".
-
-      const seenKeys = new Set();
-
-      for (let r = 0; r < data.length; r++) {
-        const row  = data[r] || [];
-        const col0 = String(row[0] ?? '').trim();
-        const col0Empty     = col0 === '';
-        const isRdResource  = /^rd\s*resource$/i.test(col0);
-        if (!col0Empty && !isRdResource) continue;
-
-        // Collect candidate nameCol positions: col 8 and any cols 9+
-        const candidateCols = [];
-        for (let c = 8; c < row.length; c++) {
-          const v = String(row[c] ?? '').trim();
-          if (v && platKw.test(v)) candidateCols.push(c);
-        }
-        if (candidateCols.length === 0) continue;
-
-        for (const nameCol of candidateCols) {
-          const platName = String(row[nameCol] ?? '').trim();
-          const startCol = nameCol - 8;
-          if (startCol < 0) continue;
-
-          const key = `${platName}|${startCol}`;
-          if (seenKeys.has(key)) continue;
-          seenKeys.add(key);
-
-          // Scan downward (up to 10 rows) for the "Job function" header row
-          let hdrRowData  = null;
-          let hdrRowIdx   = -1;
-          for (let hr = r + 1; hr < Math.min(data.length, r + 10); hr++) {
-            const candidate = data[hr] || [];
-            if (/job\s*func/i.test(String(candidate[startCol] ?? ''))) {
-              hdrRowData = candidate;
-              hdrRowIdx  = hr;
-              break;
-            }
-          }
-          if (!hdrRowData) continue;
-
-          // Build column map from hdrRowData[startCol+1 .. nameCol]
-          const cm = { jobFunc: startCol };
-          let unitCostCount = 0;
-          for (let c = startCol + 1; c <= nameCol; c++) {
-            const h = String(hdrRowData[c] ?? '').trim().toLowerCase();
-            if (!h) continue;
-            if (!cm.headCounts && /total\s*head|head\s*count/i.test(h))      { cm.headCounts = c; continue; }
-            if (!cm.senior    && /senior/i.test(h) && !/cost|unit/i.test(h)) { cm.senior     = c; continue; }
-            if (!cm.junior    && /junior/i.test(h) && !/cost|unit/i.test(h)) { cm.junior     = c; continue; }
-            if (/unit\s*cost|unit\s*price/i.test(h)) {
-              unitCostCount++;
-              if (unitCostCount === 1 && !cm.seniorCost) { cm.seniorCost = c; continue; }
-              if (unitCostCount === 2 && !cm.juniorCost) { cm.juniorCost = c; continue; }
-            }
-            if (!cm.dedication && /dedic/i.test(h))                          { cm.dedication = c; continue; }
-            if (!cm.timeLen    && /time|length|month/i.test(h))              { cm.timeLen    = c; continue; }
-            if (!cm.totalCost  && /total\s*(cost|amount)/i.test(h))          { cm.totalCost  = c; continue; }
-          }
-          // Fallback to fixed offsets
-          if (!cm.headCounts) cm.headCounts = startCol + 1;
-          if (!cm.senior)     cm.senior     = startCol + 2;
-          if (!cm.seniorCost) cm.seniorCost = startCol + 3;
-          if (!cm.junior)     cm.junior     = startCol + 4;
-          if (!cm.juniorCost) cm.juniorCost = startCol + 5;
-          if (!cm.dedication) cm.dedication = startCol + 6;
-          if (!cm.timeLen)    cm.timeLen    = startCol + 7;
-          if (!cm.totalCost)  cm.totalCost  = nameCol;  // last col of group
-
-          // Read data rows from hdrRowIdx+1 until "Total amount"
-          const rows = [];
-          let totalAmt = null;
-          for (let dr = hdrRowIdx + 1; dr < data.length; dr++) {
-            const drow    = data[dr] || [];
-            const jobFunc = String(drow[cm.jobFunc] ?? '').trim();
-            if (!jobFunc) continue;
-            if (/^total/i.test(jobFunc)) { totalAmt = parseNum(drow[cm.totalCost]); break; }
-            rows.push({
-              jobFunc,
-              headCounts: parseNum(drow[cm.headCounts]),
-              senior:     parseNum(drow[cm.senior]),
-              seniorCost: parseNum(drow[cm.seniorCost]),
-              junior:     parseNum(drow[cm.junior]),
-              juniorCost: parseNum(drow[cm.juniorCost]),
-              dedication: parseNum(drow[cm.dedication]),
-              timeLen:    parseNum(drow[cm.timeLen]),
-              totalCost:  parseNum(drow[cm.totalCost]),
-            });
-          }
-
-          if (rows.length > 0 || totalAmt !== null) {
-            platforms.push({ name: platName, rows, totalAmt, _colMap: cm });
-          }
-        }
-      }
-      return platforms;
     }
+    if (endCols.size === 0) endCols.add(8);
 
-    // ── HQ: for each platform group: build colMap, get name, read data rows ──
-    const hdrRow       = data[hdrRowIdx] || [];
-    const dataStartRow = hdrRowIdx + 1;
-
-    for (let gi = 0; gi < groupStartCols.length; gi++) {
-      const startCol     = groupStartCols[gi];
-      const nextGroupCol = groupStartCols[gi + 1] ?? (startCol + 50);
-
-      const cm = { jobFunc: startCol };
-      let unitCostCount = 0;
-      for (let c = startCol + 1; c < nextGroupCol && c < hdrRow.length; c++) {
-        const h = String(hdrRow[c] ?? '').trim().toLowerCase();
-        if (!h) continue;
-        if (!cm.headCounts && /total\s*head|head\s*count/i.test(h))      { cm.headCounts = c; continue; }
-        if (!cm.senior    && /senior/i.test(h) && !/cost|unit/i.test(h)) { cm.senior     = c; continue; }
-        if (!cm.junior    && /junior/i.test(h) && !/cost|unit/i.test(h)) { cm.junior     = c; continue; }
-        if (/unit\s*cost|unit\s*price/i.test(h)) {
-          unitCostCount++;
-          if (unitCostCount === 1 && !cm.seniorCost) { cm.seniorCost = c; continue; }
-          if (unitCostCount === 2 && !cm.juniorCost) { cm.juniorCost = c; continue; }
-        }
-        if (!cm.dedication && /dedic/i.test(h))                          { cm.dedication = c; continue; }
-        if (!cm.timeLen    && /time|length|month/i.test(h))              { cm.timeLen    = c; continue; }
-        if (!cm.totalCost  && /total\s*(cost|amount)/i.test(h))          { cm.totalCost  = c; continue; }
-      }
-      if (!cm.headCounts) cm.headCounts = startCol + 1;
-      if (!cm.senior)     cm.senior     = startCol + 2;
-      if (!cm.seniorCost) cm.seniorCost = startCol + 3;
-      if (!cm.junior)     cm.junior     = startCol + 4;
-      if (!cm.juniorCost) cm.juniorCost = startCol + 5;
-      if (!cm.dedication) cm.dedication = startCol + 6;
-      if (!cm.timeLen)    cm.timeLen    = startCol + 7;
-      if (!cm.totalCost)  cm.totalCost  = startCol + 8;
-
-      // HQ: platform name is in the platform header row at startCol
-      const platName = String(data[platHdrRowIdx]?.[startCol] ?? '').trim();
-      if (!platName) continue;
-
-      const rows = [];
-      let totalAmt = null;
-      for (let r = dataStartRow; r < data.length; r++) {
+    const platforms = [];
+    for (const endCol of [...endCols].sort((a, b) => a - b)) {
+      const startCol = endCol - 8;
+      if (startCol < 0) continue;
+      let currentPlat = null;
+      let inData = false;
+      let fo = { headCounts:1, senior:2, seniorCost:3, junior:4, juniorCost:5, dedication:6, timeLen:7, totalCost:8 };
+      for (let r = 0; r < data.length; r++) {
         const row = data[r] || [];
-        const jobFunc = String(row[cm.jobFunc] ?? '').trim();
-        if (!jobFunc) continue;
-        if (/^total/i.test(jobFunc)) { totalAmt = parseNum(row[cm.totalCost]); break; }
-        rows.push({
-          jobFunc,
-          headCounts: parseNum(row[cm.headCounts]),
-          senior:     parseNum(row[cm.senior]),
-          seniorCost: parseNum(row[cm.seniorCost]),
-          junior:     parseNum(row[cm.junior]),
-          juniorCost: parseNum(row[cm.juniorCost]),
-          dedication: parseNum(row[cm.dedication]),
-          timeLen:    parseNum(row[cm.timeLen]),
-          totalCost:  parseNum(row[cm.totalCost]),
+        const s0 = String(row[startCol] ?? '').trim();
+        const sE = String(row[endCol]   ?? '').trim();
+        if (!s0 && PLAT_KW.test(sE)) {
+          if (currentPlat && (currentPlat.rows.length > 0 || currentPlat.totalAmt !== null)) platforms.push(currentPlat);
+          currentPlat = { name: sE, rows: [], totalAmt: null };
+          inData = false; continue;
+        }
+        if (!currentPlat) continue;
+        if (JOB_FUNC_KW.test(s0)) {
+          fo = { headCounts:1, senior:2, seniorCost:3, junior:4, juniorCost:5, dedication:6, timeLen:7, totalCost:8 };
+          for (let c = startCol + 1; c <= endCol; c++) {
+            const v = String(row[c] ?? '').trim().toLowerCase();
+            const off = c - startCol;
+            if (/total.*cost|cost.*amount/i.test(v))       fo.totalCost  = off;
+            else if (/head.*count|total.*head/i.test(v))   fo.headCounts = off;
+            else if (/senior.*cost|cost.*senior/i.test(v)) fo.seniorCost = off;
+            else if (/junior.*cost|cost.*junior/i.test(v)) fo.juniorCost = off;
+            else if (/^senior/i.test(v))                   fo.senior     = off;
+            else if (/^junior/i.test(v))                   fo.junior     = off;
+            else if (/dedic/i.test(v))                     fo.dedication = off;
+            else if (/time|month/i.test(v))                fo.timeLen    = off;
+          }
+          inData = true; continue;
+        }
+        if (!inData) continue;
+        if (TOTAL_AMT_KW.test(s0)) {
+          currentPlat.totalAmt = parseNum(row[startCol + fo.totalCost]);
+          inData = false; continue;
+        }
+        if (s0) currentPlat.rows.push({
+          jobFunc: s0,
+          headCounts: parseNum(row[startCol + fo.headCounts]),
+          senior:     parseNum(row[startCol + fo.senior]),
+          seniorCost: parseNum(row[startCol + fo.seniorCost]),
+          junior:     parseNum(row[startCol + fo.junior]),
+          juniorCost: parseNum(row[startCol + fo.juniorCost]),
+          dedication: parseNum(row[startCol + fo.dedication]),
+          timeLen:    parseNum(row[startCol + fo.timeLen]),
+          totalCost:  parseNum(row[startCol + fo.totalCost]),
         });
       }
-
-      if (rows.length > 0 || totalAmt !== null) platforms.push({ name: platName, rows, totalAmt, _colMap: cm });
+      if (currentPlat && (currentPlat.rows.length > 0 || currentPlat.totalAmt !== null)) platforms.push(currentPlat);
     }
-
     return platforms;
   }
 
@@ -1476,8 +1349,8 @@
   function renderOdmRd(data1, data2, sheetName, nameA, nameB) {
     const fmtA = detectOdmRdFormat(data1);
     const fmtB = detectOdmRdFormat(data2);
-    const platsA = parseOdmRdPlatforms(data1, fmtA);
-    const platsB = parseOdmRdPlatforms(data2, fmtB);
+    const platsA = parseOdmRdPlatforms(data1);
+    const platsB = parseOdmRdPlatforms(data2);
 
     const failA = platsA.length === 0;
     const failB = platsB.length === 0;
