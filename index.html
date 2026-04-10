@@ -843,20 +843,27 @@
       const s0 = String(row[0] ?? '').trim();
       const s6 = String(row[6] ?? '').trim();
 
+      // 平台標題：col0 空 AND col6 含 Flip_Marina
       if (!s0 && /flip_?marina/i.test(s6) && !/total/i.test(s6)) {
         cur = { header: s6, key: normPlatform(s6), subtotalAmtWhq: null, subtotalAmtWcq: null, subtotalAmt: null, items: [] };
         blocks.push(cur);
         continue;
       }
       if (!cur) continue;
-      if (s0 && SKIP_0.test(s0)) continue;
 
-      if (!s0 && typeof row[6] === 'number') {
+      // ODM IUR 彙總行：col0='ODM IUR' AND col6 是數字 → 當作平台小計
+      if (/^odm\s*iur$/i.test(s0) && typeof row[6] === 'number') {
         cur.subtotalAmtWhq = typeof row[4] === 'number' ? row[4] : null;
         cur.subtotalAmtWcq = typeof row[5] === 'number' ? row[5] : null;
         cur.subtotalAmt    = row[6];
+        console.log(`平台 ${cur.header} ODM IUR彙總值: ${row[6]}`);
         continue;
       }
+
+      // 其他略過行
+      if (s0 && SKIP_0.test(s0)) continue;
+
+      // 資料行
       if (s0) {
         cur.items.push({
           platform:  s0,
@@ -925,16 +932,20 @@
         continue;
       }
       if (!curQ) continue;
-      if (s9 && SKIP_9.test(s9)) continue;
 
-      // 小計行：Platform 欄空 AND Total 欄是數字
-      if (!s9 && typeof row[qcTotalCol] === 'number') {
-        curQ.subtotalAmtWhq = typeof row[qcTotalCol - 2] === 'number' ? row[qcTotalCol - 2] : null;
-        curQ.subtotalAmtWcq = typeof row[qcTotalCol - 1] === 'number' ? row[qcTotalCol - 1] : null;
-        curQ.subtotalAmt    = row[qcTotalCol];
+      // ODM IUR 彙總行：col8='ODM IUR' AND col14 是數字 → 當作 Qualcomm 平台小計
+      const s8 = String(row[8] ?? '').trim();
+      if (/^odm\s*iur$/i.test(s8) && typeof row[14] === 'number') {
+        curQ.subtotalAmtWhq = typeof row[12] === 'number' ? row[12] : null;
+        curQ.subtotalAmtWcq = typeof row[13] === 'number' ? row[13] : null;
+        curQ.subtotalAmt    = row[14];
+        console.log(`平台 ${curQ.header} ODM IUR彙總值: ${row[14]}`);
         continue;
       }
-      // 資料行：Platform 欄有值（全部加入 items，含 Free Sample；過濾在 subtotalAmt 計算時處理）
+
+      if (s9 && SKIP_9.test(s9)) continue;
+
+      // 資料行：Platform 欄有值
       if (s9) {
         curQ.items.push({
           platform:  s9,
@@ -948,33 +959,12 @@
       }
     }
     const qcomBlocksW = blocks.filter(b => b.chipset === 'qcom');
-    console.log('[Wistron] Intel 平台數:', blocks.filter(b => !b.chipset).length, '| Qualcomm 平台數:', qcomBlocksW.length);
-
-    // ── 重新計算各平台 subtotalAmt（排除 Free Sample / ODM IUR）──
-    // sheet 小計行（ODM IUR 彙總行）的值含 Free Sample (CPU)，故改用 items 加總覆寫
-    const isExcluded = p => String(p ?? '').toLowerCase().includes('free sample') ||
-                            String(p ?? '').toLowerCase().includes('odm iur');
-
     const intelBlocks = blocks.filter(b => !b.chipset);
-    intelBlocks.forEach(b => {
-      b.items.forEach(it => console.log(`  [Intel/${b.header}] item: ${it.platform}, total: ${it.totalAmt}`));
-      b.subtotalAmt = b.items
-        .filter(it => !isExcluded(it.platform))
-        .reduce((s, it) => s + (it.totalAmt ?? 0), 0);
-      console.log(`平台 ${b.header} 重新計算小計: ${b.subtotalAmt}`);
-    });
+    console.log('[Wistron] Intel 平台數:', intelBlocks.length, '| Qualcomm 平台數:', qcomBlocksW.length);
 
-    qcomBlocksW.forEach(b => {
-      b.items.forEach(it => console.log(`  [Qcom/${b.header}] item: ${it.platform}, total: ${it.totalAmt}`));
-      b.subtotalAmt = b.items
-        .filter(it => !isExcluded(it.platform))
-        .reduce((s, it) => s + (it.totalAmt ?? 0), 0);
-      console.log(`平台 ${b.header} 重新計算小計: ${b.subtotalAmt}`);
-    });
-
-    // Grand Total = 重新計算後的各平台 subtotalAmt 加總
+    // Grand Total = 各平台 ODM IUR 彙總行的值加總
     console.log('=== Wistron Grand Total 計算明細 ===');
-    const intelGrandTotal    = intelBlocks.reduce((s, b) => {
+    const intelGrandTotal = intelBlocks.reduce((s, b) => {
       console.log(`加入 Intel 平台小計 [${b.header}]: ${b.subtotalAmt}`);
       return s + (b.subtotalAmt ?? 0);
     }, 0);
