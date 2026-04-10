@@ -723,16 +723,7 @@
         break;
       }
     }
-    console.log('[HQ] Qualcomm 標題欄: col' + qcomHdrCol);
     if (qcomHdrCol === -1) {
-      // fallback：顯示 col9-col13 每欄的非空值，方便診斷
-      console.log('[HQ] 找不到 Qualcomm 標題欄，掃描 col9-col13 樣本:');
-      data.slice(0, 30).forEach((row, i) => {
-        for (let c = 9; c <= 13; c++) {
-          const v = String(row?.[c] ?? '').trim();
-          if (v) console.log(`  row[${i}] col${c}=${v}`);
-        }
-      });
       qcomHdrCol = 11;
     }
 
@@ -772,7 +763,6 @@
           seenQcomKeys.add(key);
           curQcom = { header: sQH, key, subtotalAmt: null, items: [], chipset: 'qcom' };
           qcomBlocks.push(curQcom);
-          console.log('[HQ] Qualcomm 平台 row' + r + ':', sQH);
         }
       }
 
@@ -795,8 +785,6 @@
         curQcom.subtotalAmt = row[10];
       }
     }
-    console.log('[HQ] Intel 平台數:', intelBlocks.length, '| Qualcomm 平台數:', qcomBlocks.length);
-    console.log('[HQ] qualcommPlatforms:', qcomBlocks.map(b => b.header + '(items:' + b.items.length + ')'));
 
     // Grand Total：取行66的 Total-Intel(col3) 和 Total-Qualcomm(col10) 彙總值
     let intelAmt = null, qcomAmt = null;
@@ -856,7 +844,6 @@
         cur.subtotalAmtWhq = typeof row[4] === 'number' ? row[4] : null;
         cur.subtotalAmtWcq = typeof row[5] === 'number' ? row[5] : null;
         cur.subtotalAmt    = row[6];
-        console.log(`平台 ${cur.header} ODM IUR彙總值: ${row[6]}`);
         continue;
       }
 
@@ -886,16 +873,7 @@
         break;
       }
     }
-    console.log('[Wistron] Intel 標題欄: col6  Qualcomm 標題欄: col' + qcomHdrColW);
     if (qcomHdrColW === -1) {
-      const counts = {};
-      for (let c = 0; c <= 15; c++) counts[c] = 0;
-      data.forEach(row => {
-        for (let c = 0; c <= 15; c++) {
-          if (/flip_?marina/i.test(String(row?.[c] ?? ''))) counts[c]++;
-        }
-      });
-      console.log('[Wistron] 各欄 Flip_Marina 數量:', JSON.stringify(counts));
       qcomHdrColW = 15;  // fallback
     }
     // Qualcomm 資料欄：Platform = qcomHdrColW - 6（相對偏移）
@@ -903,19 +881,6 @@
     // 若標題欄不是15，則 Platform 欄 = qcomHdrColW - 6
     const qcPlatCol  = qcomHdrColW === 15 ? 9  : qcomHdrColW - 6;
     const qcTotalCol = qcomHdrColW;
-    console.log('[Wistron] Qualcomm Platform 欄: col' + qcPlatCol + '  Total 欄: col' + qcTotalCol);
-
-    // ── 診斷：掃描 row97+ 找 Free Sample 或 35000 ──
-    console.log('=== Wistron Qualcomm 診斷掃描（row97+）===');
-    data.forEach((row, i) => {
-      if (i < 97) return;
-      if (row[8] && String(row[8]).toLowerCase().includes('free')) {
-        console.log(`Qualcomm Free Sample row${i}: col8=${row[8]}, col14=${row[14]}, col15=${row[15]}`);
-      }
-      if (row[14] === 35000 || row[15] === 35000) {
-        console.log(`Qualcomm 35000 at row${i}: col8=${row[8]}, col9=${row[9]}, col14=${row[14]}, col15=${row[15]}`);
-      }
-    });
 
     let curQ = null;
 
@@ -928,7 +893,6 @@
       if (/flip_?marina/i.test(s15)) {
         curQ = { header: s15, key: normPlatform(s15), subtotalAmtWhq: null, subtotalAmtWcq: null, subtotalAmt: null, items: [], chipset: 'qcom' };
         blocks.push(curQ);
-        console.log('[Wistron] Qualcomm 平台 row' + r + ':', s15);
         continue;
       }
       if (!curQ) continue;
@@ -939,7 +903,6 @@
         curQ.subtotalAmtWhq = typeof row[12] === 'number' ? row[12] : null;
         curQ.subtotalAmtWcq = typeof row[13] === 'number' ? row[13] : null;
         curQ.subtotalAmt    = row[14];
-        console.log(`平台 ${curQ.header} ODM IUR彙總值: ${row[14]}`);
         continue;
       }
 
@@ -960,22 +923,10 @@
     }
     const qcomBlocksW = blocks.filter(b => b.chipset === 'qcom');
     const intelBlocks = blocks.filter(b => !b.chipset);
-    console.log('[Wistron] Intel 平台數:', intelBlocks.length, '| Qualcomm 平台數:', qcomBlocksW.length);
-
     // Grand Total = 各平台 ODM IUR 彙總行的值加總
-    console.log('=== Wistron Grand Total 計算明細 ===');
-    const intelGrandTotal = intelBlocks.reduce((s, b) => {
-      console.log(`加入 Intel 平台小計 [${b.header}]: ${b.subtotalAmt}`);
-      return s + (b.subtotalAmt ?? 0);
-    }, 0);
-    const qualcommGrandTotal = qcomBlocksW.reduce((s, b) => {
-      console.log(`加入 Qualcomm 平台小計 [${b.header}]: ${b.subtotalAmt}`);
-      return s + (b.subtotalAmt ?? 0);
-    }, 0);
+    const intelGrandTotal    = intelBlocks.reduce((s, b) => s + (b.subtotalAmt ?? 0), 0);
+    const qualcommGrandTotal = qcomBlocksW.reduce((s, b) => s + (b.subtotalAmt ?? 0), 0);
     const grandTotal = intelGrandTotal + qualcommGrandTotal;
-    console.log(`Intel Grand Total: ${intelGrandTotal}`);
-    console.log(`Qualcomm Grand Total: ${qualcommGrandTotal}`);
-    console.log(`最終 Grand Total: ${grandTotal}`);
     return { blocks, qualcommPlatforms: qcomBlocksW, grandTotal, intelGrandTotal, qualcommGrandTotal };
   }
 
@@ -1028,10 +979,7 @@
     // ── 確認 Qualcomm 平台是否正確載入 ──
     const aQcomInBlocks = aBlocks.filter(b => b.chipset === 'qcom');
     const bQcomInBlocks = bBlocks.filter(b => b.chipset === 'qcom');
-    console.log(`renderOdmIur - ${nameA}(${fmtA}) Intel平台數:`, aBlocks.filter(b => b.chipset !== 'qcom').length, '| Qualcomm平台數:', aQcomInBlocks.length);
-    console.log(`renderOdmIur - ${nameB}(${fmtB}) Intel平台數:`, bBlocks.filter(b => b.chipset !== 'qcom').length, '| Qualcomm平台數:', bQcomInBlocks.length);
-    if (aQcomInBlocks.length) console.log(`  ${nameA} Qualcomm平台:`, aQcomInBlocks.map(b => `${b.header}(items:${b.items.length})`));
-    if (bQcomInBlocks.length) console.log(`  ${nameB} Qualcomm平台:`, bQcomInBlocks.map(b => `${b.header}(items:${b.items.length})`));
+;
     // ── ──
 
     const makeNote = (fmt, intelAmt, qcomAmt) => {
@@ -1143,8 +1091,6 @@
     const thB = fmtB === 'wistron' ? thWis : thHq;
     const noteA = makeNote(fmtA, aIntelAmt, aQcomAmt);
     const noteB = makeNote(fmtB, bIntelAmt, bQcomAmt);
-    console.log(`[render] ${nameA}(${fmtA}) noteA=`, noteA);
-    console.log(`[render] ${nameB}(${fmtB}) noteB=`, noteB);
     const rowsA = fmtA === 'wistron' ? buildARows(aBlocks, aGrandTotal, noteA) : buildBRows(aBlocks, aGrandTotal, noteA);
     const rowsB = fmtB === 'wistron' ? buildARows(bBlocks, bGrandTotal, noteB) : buildBRows(bBlocks, bGrandTotal, noteB);
 
@@ -1287,22 +1233,6 @@
       if (totalRow) {
         const addedRows   = rows.filter(r => r.type === 'added');
         const removedRows = rows.filter(r => r.type === 'removed');
-
-        // console.log 確認 Total 行數值及獨有項目
-        console.log('[NRE] Total 行:', totalRow.key);
-        cols.forEach((col, i) => {
-          console.log(`  col[${i}] "${col}" → A=${totalRow.colData[i]?.vA?.num} B=${totalRow.colData[i]?.vB?.num}`);
-        });
-        if (removedRows.length) {
-          console.log('[NRE] A 獨有項目（已含於 Total，不重複加）:', removedRows.map(r => r.key));
-          removedRows.forEach(r => cols.forEach((col, i) =>
-            console.log(`  A獨有 "${r.key}" col[${i}] → A=${r.colData[i]?.vA?.num}`)));
-        }
-        if (addedRows.length) {
-          console.log('[NRE] B 獨有項目（已含於 Total，不重複加）:', addedRows.map(r => r.key));
-          addedRows.forEach(r => cols.forEach((col, i) =>
-            console.log(`  B獨有 "${r.key}" col[${i}] → B=${r.colData[i]?.vB?.num}`)));
-        }
 
         // 最終總計 = Total 直接使用，不加獨有項目
         adjData = cols.map((_, i) => {
