@@ -318,6 +318,25 @@
     .odm-data-even td { background: rgba(255,255,255,.02); }
 
     /* ── ODM RD Resource 比對 ────────────────────────────────── */
+    .rd-warning {
+      background: rgba(251,146,60,.1); border: 1px solid rgba(251,146,60,.3);
+      color: #fb923c; border-radius: 8px; padding: 10px 16px;
+      margin: 12px 20px; font-size: .84rem;
+    }
+    .rd-tab-bar { display:flex; gap:2px; padding:12px 20px 0; border-bottom:1px solid rgba(255,255,255,.07); }
+    .rd-tab {
+      padding: 6px 18px; border-radius: 8px 8px 0 0; cursor: pointer;
+      font-size: .82rem; border: 1px solid transparent; border-bottom: none;
+      color: #64748b; background: transparent; transition: all .15s;
+    }
+    .rd-tab:hover { color: #94a3b8; }
+    .rd-tab.active { color: #e2e8f0; background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.1); }
+    .rd-tab-content { display:none; }
+    .rd-tab-content.active { display:block; }
+    .rd-raw-table { width:100%; border-collapse:collapse; font-size:.74rem; font-family:'JetBrains Mono',monospace; }
+    .rd-raw-table th { background:rgba(255,255,255,.05); color:#64748b; padding:4px 8px; border:1px solid rgba(255,255,255,.06); text-align:center; white-space:nowrap; }
+    .rd-raw-table td { padding:3px 8px; border:1px solid rgba(255,255,255,.05); color:#94a3b8; white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis; }
+    .rd-raw-table tr:nth-child(even) td { background:rgba(255,255,255,.02); }
     .rd-selector {
       display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end;
       padding: 16px 20px; background: rgba(255,255,255,.02);
@@ -560,14 +579,12 @@
   }
 
   // ── Raw sheet rows (包含空白行，不跳過) ─────────────────────
-  // 強制讀取到至少 startCol+15 欄，確保 HQ Qualcomm (col7-12) 和
-  // Wistron Qualcomm (col9-15) 都能被讀到
+  // 讀取工作表全部欄位（不設上限），以完整涵蓋 RD resource 多平台橫向佈局
   function getRawSheetRows(wb, name) {
     const ws = wb.Sheets[name];
     if (!ws || !ws['!ref']) return [];
     const range = XLSX.utils.decode_range(ws['!ref']);
-    const minEndC = range.s.c + 15;  // 至少讀到起始欄 + 15 欄（共 16 欄）
-    const endC = Math.max(range.e.c, minEndC);
+    const endC = range.e.c;
     const rows = [];
     for (let r = range.s.r; r <= range.e.r; r++) {
       const row = [];
@@ -1184,14 +1201,17 @@
     return /odm.*rd|rd.*resource/i.test(name);
   }
 
-  // Detect HQ vs Wistron for RD resource sheet
-  // HQ:      row0 has platform names like "Intel WCL-U"
-  // Wistron: row1 contains "RD resource" label
+  // Detect HQ vs Wistron for RD resource sheet — scan first 15 rows
   function detectOdmRdFormat(data) {
-    const row1 = data[1] || [];
-    if (row1.some(c => /rd\s*resource/i.test(String(c ?? '')))) return 'wistron';
-    const row0 = data[0] || [];
-    if (row0.some(c => /intel|qualcomm/i.test(String(c ?? '')))) return 'hq';
+    const limit = Math.min(data.length, 15);
+    for (let r = 0; r < limit; r++) {
+      const row = data[r] || [];
+      if (row.some(c => /rd\s*resource/i.test(String(c ?? '')))) return 'wistron';
+    }
+    for (let r = 0; r < limit; r++) {
+      const row = data[r] || [];
+      if (row.some(c => /intel\s+wcl|intel\s+ptl|intel\s+nvl|qualcomm/i.test(String(c ?? '')))) return 'hq';
+    }
     return 'unknown';
   }
 
@@ -1207,84 +1227,121 @@
     return null;
   }
 
-  // Parse platforms from RD resource sheet
+  // Parse platforms from RD resource sheet — dynamic column detection
   // Returns [{ name, rows:[{jobFunc,headCounts,senior,seniorCost,junior,juniorCost,dedication,timeLen,totalCost}], totalAmt }]
   function parseOdmRdPlatforms(data, fmt) {
     const platforms = [];
+    const limit15 = Math.min(data.length, 15);
 
-    if (fmt === 'hq') {
-      // Row 0: platform names at group-start columns
-      // Groups: col0-8 (data), col9-17 (gap), col18-26 (data)… step=18
-      // Platform name is at the START col of the group
-      const row0 = data[0] || [];
-      for (let c = 0; c < row0.length; c++) {
-        const name = String(row0[c] ?? '').trim();
-        if (!name) continue;
-        if (!/intel|qualcomm|wcl|ptl|nvl|purwa|flip|marina/i.test(name)) continue;
-        const startCol = c;
-        const rows = [];
-        let totalAmt = null;
-        for (let r = 6; r < data.length; r++) {
-          const row = data[r] || [];
-          const jobFunc = String(row[startCol] ?? '').trim();
-          if (!jobFunc) continue;
-          if (/^total/i.test(jobFunc)) {
-            totalAmt = parseNum(row[startCol + 8]);
-            break;
-          }
-          rows.push({
-            jobFunc,
-            headCounts: parseNum(row[startCol + 1]),
-            senior:     parseNum(row[startCol + 2]),
-            seniorCost: parseNum(row[startCol + 3]),
-            junior:     parseNum(row[startCol + 4]),
-            juniorCost: parseNum(row[startCol + 5]),
-            dedication: parseNum(row[startCol + 6]),
-            timeLen:    parseNum(row[startCol + 7]),
-            totalCost:  parseNum(row[startCol + 8]),
-          });
-        }
-        if (rows.length > 0 || totalAmt !== null) platforms.push({ name, rows, totalAmt });
+    // ── Step 1: Find the column-header row (contains "Job function") ──
+    let hdrRowIdx = -1;
+    let jobFuncCols = [];
+    for (let r = 0; r < limit15; r++) {
+      const row = data[r] || [];
+      const cols = [];
+      for (let c = 0; c < row.length; c++) {
+        if (/job\s*func/i.test(String(row[c] ?? ''))) cols.push(c);
       }
-    } else {
-      // Wistron: row1 (index 1) has platform names
-      // Group 1: col0-8, platform name at col8
-      // Group 2: col11-19, platform name at col19 (gap=2 between groups)
-      // So: scan row1 for non-empty, non-"RD resource" cells → nameCol
-      // groupStart = nameCol - 8
-      const row1 = data[1] || [];
-      for (let c = 0; c < row1.length; c++) {
-        const name = String(row1[c] ?? '').trim();
-        if (!name || /rd\s*resource/i.test(name)) continue;
-        const startCol = c - 8;
-        if (startCol < 0) continue;
-        const rows = [];
-        let totalAmt = null;
-        for (let r = 3; r < data.length; r++) {
-          const row = data[r] || [];
-          const jobFunc = String(row[startCol] ?? '').trim();
-          if (!jobFunc) continue;
-          if (/^total/i.test(jobFunc)) {
-            totalAmt = parseNum(row[startCol + 8]);
-            break;
-          }
-          rows.push({
-            jobFunc,
-            headCounts: parseNum(row[startCol + 1]),
-            senior:     parseNum(row[startCol + 2]),
-            seniorCost: parseNum(row[startCol + 3]),
-            junior:     parseNum(row[startCol + 4]),
-            juniorCost: parseNum(row[startCol + 5]),
-            dedication: parseNum(row[startCol + 6]),
-            timeLen:    parseNum(row[startCol + 7]),
-            totalCost:  parseNum(row[startCol + 8]),
-          });
+      if (cols.length > 0) { hdrRowIdx = r; jobFuncCols = cols; break; }
+    }
+    if (hdrRowIdx < 0) return platforms;
+
+    // ── Step 2: For each group build a column map from the header row ──
+    const hdrRow = data[hdrRowIdx] || [];
+    const dataStartRow = hdrRowIdx + 1;
+
+    for (let gi = 0; gi < jobFuncCols.length; gi++) {
+      const startCol = jobFuncCols[gi];
+      const nextGroupCol = jobFuncCols[gi + 1] ?? (startCol + 50);
+
+      // Build column map by scanning header labels within this group
+      const cm = { jobFunc: startCol };
+      let unitCostCount = 0;
+      for (let c = startCol + 1; c < nextGroupCol && c < hdrRow.length; c++) {
+        const h = String(hdrRow[c] ?? '').trim().toLowerCase();
+        if (!h) continue;
+        if (!cm.headCounts && /total\s*head|head\s*count/i.test(h))   { cm.headCounts = c; continue; }
+        if (!cm.senior    && /senior/i.test(h) && !/cost|unit/i.test(h)) { cm.senior = c; continue; }
+        if (!cm.junior    && /junior/i.test(h) && !/cost|unit/i.test(h)) { cm.junior = c; continue; }
+        if (/unit\s*cost|unit\s*price/i.test(h)) {
+          unitCostCount++;
+          if (unitCostCount === 1 && !cm.seniorCost) { cm.seniorCost = c; continue; }
+          if (unitCostCount === 2 && !cm.juniorCost) { cm.juniorCost = c; continue; }
         }
-        if (rows.length > 0 || totalAmt !== null) platforms.push({ name, rows, totalAmt });
+        if (!cm.dedication && /dedic/i.test(h))               { cm.dedication = c; continue; }
+        if (!cm.timeLen    && /time|length|month/i.test(h))   { cm.timeLen    = c; continue; }
+        if (!cm.totalCost  && /total\s*(cost|amount)/i.test(h)) { cm.totalCost = c; continue; }
       }
+      // Fallback to fixed offsets if detection incomplete
+      if (!cm.headCounts) cm.headCounts = startCol + 1;
+      if (!cm.senior)     cm.senior     = startCol + 2;
+      if (!cm.seniorCost) cm.seniorCost = startCol + 3;
+      if (!cm.junior)     cm.junior     = startCol + 4;
+      if (!cm.juniorCost) cm.juniorCost = startCol + 5;
+      if (!cm.dedication) cm.dedication = startCol + 6;
+      if (!cm.timeLen)    cm.timeLen    = startCol + 7;
+      if (!cm.totalCost)  cm.totalCost  = startCol + 8;
+
+      // ── Step 3: Find platform name in rows above hdrRowIdx ──
+      let platName = '';
+      for (let r = 0; r < hdrRowIdx && !platName; r++) {
+        const row = data[r] || [];
+        // Check startCol and the totalCost col (last col of group) for the name
+        for (const c of [startCol, cm.totalCost, startCol + 1]) {
+          const v = String(row[c] ?? '').trim();
+          if (v && /intel|qualcomm|wcl|ptl|nvl|purwa|flip|marina/i.test(v)) {
+            platName = v; break;
+          }
+        }
+      }
+      if (!platName) continue;
+
+      // ── Step 4: Read data rows ──
+      const rows = [];
+      let totalAmt = null;
+      for (let r = dataStartRow; r < data.length; r++) {
+        const row = data[r] || [];
+        const jobFunc = String(row[cm.jobFunc] ?? '').trim();
+        if (!jobFunc) continue;
+        if (/^total/i.test(jobFunc)) {
+          totalAmt = parseNum(row[cm.totalCost]);
+          break;
+        }
+        rows.push({
+          jobFunc,
+          headCounts: parseNum(row[cm.headCounts]),
+          senior:     parseNum(row[cm.senior]),
+          seniorCost: parseNum(row[cm.seniorCost]),
+          junior:     parseNum(row[cm.junior]),
+          juniorCost: parseNum(row[cm.juniorCost]),
+          dedication: parseNum(row[cm.dedication]),
+          timeLen:    parseNum(row[cm.timeLen]),
+          totalCost:  parseNum(row[cm.totalCost]),
+        });
+      }
+
+      platforms.push({ name: platName, rows, totalAmt, _colMap: cm });
     }
 
     return platforms;
+  }
+
+  // ── Build raw-data HTML table (first maxRows rows, all cols) ──
+  function buildRdRawTable(data) {
+    if (!data || data.length === 0) return '<p style="color:#64748b;padding:16px">無資料</p>';
+    const maxRows = Math.min(data.length, 60);
+    const maxCols = data.slice(0, maxRows).reduce((m, r) => Math.max(m, (r||[]).length), 0);
+    let th = '<tr><th>#</th>' + Array.from({length: maxCols}, (_, i) => `<th>${i}</th>`).join('') + '</tr>';
+    let tb = '';
+    for (let r = 0; r < maxRows; r++) {
+      const row = data[r] || [];
+      const cells = Array.from({length: maxCols}, (_, c) => `<td>${esc(String(row[c] ?? ''))}</td>`).join('');
+      tb += `<tr><th>${r}</th>${cells}</tr>`;
+    }
+    return `<div style="overflow:auto;max-height:500px;padding:12px 20px">
+      <table class="rd-raw-table"><thead>${th}</thead><tbody>${tb}</tbody></table>
+      ${data.length > maxRows ? `<div style="color:#64748b;font-size:.78rem;padding:8px 0">（僅顯示前 ${maxRows} 行，共 ${data.length} 行）</div>` : ''}
+    </div>`;
   }
 
   // ── Render ODM RD Resource ────────────────────────────────────
@@ -1294,6 +1351,9 @@
     const platsA = parseOdmRdPlatforms(data1, fmtA);
     const platsB = parseOdmRdPlatforms(data2, fmtB);
 
+    const failA = platsA.length === 0;
+    const failB = platsB.length === 0;
+
     // Auto-match B platform to A platform by keyword
     const autoMatchB = (platA) => {
       const ka = rdKeyword(platA.name);
@@ -1301,12 +1361,20 @@
     };
 
     // Store state globally for selector callbacks
-    window._rdState = { platsA, platsB, nameA, nameB, fmtA, fmtB };
+    window._rdState = { platsA, platsB, nameA, nameB, fmtA, fmtB, data1, data2 };
 
-    const selOptsA = platsA.map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('');
-    const selOptsB = platsB.map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('');
+    // Selector options — always show something, disabled if empty
+    const selOptsA = failA
+      ? '<option disabled selected>無平台資料</option>'
+      : platsA.map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('');
+    const selOptsB = failB
+      ? '<option disabled selected>無平台資料</option>'
+      : platsB.map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('');
 
-    const initB = platsA.length > 0 ? autoMatchB(platsA[0]) : 0;
+    const warnA = failA ? `<div class="rd-warning">⚠️ ${esc(nameA)}（${fmtA}）解析失敗：未找到 Job function 欄或平台名稱，請查看「原始資料 A」確認格式</div>` : '';
+    const warnB = failB ? `<div class="rd-warning">⚠️ ${esc(nameB)}（${fmtB}）解析失敗：未找到 Job function 欄或平台名稱，請查看「原始資料 B」確認格式</div>` : '';
+
+    const initB = (!failA && !failB && platsA.length > 0) ? autoMatchB(platsA[0]) : 0;
     const initBVal = initB >= 0 ? initB : 0;
 
     const html = `
@@ -1315,33 +1383,71 @@
         <div class="stat-card"><div class="stat-number" style="color:#34d399">${platsB.length}</div><div class="stat-label">${esc(nameB)} 平台數（${fmtB}）</div></div>
       </div>
       <div class="section" style="padding:0;">
-        <div class="section-title" style="padding:14px 20px 0">📐 工作表「${esc(sheetName)}」RD Resource 比對</div>
-        <div class="rd-selector">
-          <div>
-            <label>🔵 ${esc(nameA)} 平台</label>
-            <select class="rd-select" id="rdSelA" onchange="updateRdComparison()">
-              ${selOptsA}
-            </select>
-          </div>
-          <div>
-            <label>🟢 ${esc(nameB)} 平台</label>
-            <select class="rd-select" id="rdSelB" onchange="updateRdComparison()">
-              ${selOptsB}
-            </select>
-          </div>
+        <div class="section-title" style="padding:14px 20px 8px">📐 工作表「${esc(sheetName)}」RD Resource 比對</div>
+        ${warnA}${warnB}
+        <div class="rd-tab-bar">
+          <button class="rd-tab active" onclick="switchRdTab('compare')">📊 比對</button>
+          <button class="rd-tab" onclick="switchRdTab('rawA')">📄 原始資料 A（${esc(nameA)}）</button>
+          <button class="rd-tab" onclick="switchRdTab('rawB')">📄 原始資料 B（${esc(nameB)}）</button>
         </div>
-        <div id="rdTableContainer" class="rd-table-wrap"></div>
+        <div id="rdTabCompare" class="rd-tab-content active">
+          <div class="rd-selector">
+            <div>
+              <label>🔵 ${esc(nameA)} 平台</label>
+              <select class="rd-select" id="rdSelA" onchange="updateRdComparison()" ${failA ? 'disabled' : ''}>
+                ${selOptsA}
+              </select>
+            </div>
+            <div>
+              <label>🟢 ${esc(nameB)} 平台</label>
+              <select class="rd-select" id="rdSelB" onchange="updateRdComparison()" ${failB ? 'disabled' : ''}>
+                ${selOptsB}
+              </select>
+            </div>
+          </div>
+          <div id="rdTableContainer" class="rd-table-wrap"></div>
+        </div>
+        <div id="rdTabRawA" class="rd-tab-content"></div>
+        <div id="rdTabRawB" class="rd-tab-content"></div>
       </div>`;
 
     const el = document.getElementById('results');
     el.innerHTML = html;
     el.classList.remove('hidden');
 
-    // Set auto-matched B selection then render
+    // Lazy-load raw tables only when tab is first opened
+    window._rdRawBuilt = { A: false, B: false };
+
+    // Set auto-matched B selection then render comparison
     const selB = document.getElementById('rdSelB');
-    if (selB) selB.value = initBVal;
-    updateRdComparison();
+    if (selB && !failB) selB.value = initBVal;
+    if (!failA && !failB) updateRdComparison();
   }
+
+  // Tab switcher
+  window.switchRdTab = function(tab) {
+    const tabs    = document.querySelectorAll('.rd-tab');
+    const compare = document.getElementById('rdTabCompare');
+    const rawA    = document.getElementById('rdTabRawA');
+    const rawB    = document.getElementById('rdTabRawB');
+    [compare, rawA, rawB].forEach(el => el && el.classList.remove('active'));
+    tabs.forEach((t, i) => t.classList.toggle('active', i === ['compare','rawA','rawB'].indexOf(tab)));
+    if (tab === 'compare') compare && compare.classList.add('active');
+    if (tab === 'rawA') {
+      rawA && rawA.classList.add('active');
+      if (!window._rdRawBuilt?.A && window._rdState?.data1) {
+        rawA.innerHTML = buildRdRawTable(window._rdState.data1);
+        window._rdRawBuilt.A = true;
+      }
+    }
+    if (tab === 'rawB') {
+      rawB && rawB.classList.add('active');
+      if (!window._rdRawBuilt?.B && window._rdState?.data2) {
+        rawB.innerHTML = buildRdRawTable(window._rdState.data2);
+        window._rdRawBuilt.B = true;
+      }
+    }
+  };
 
   // Called when selectors change
   window.updateRdComparison = function() {
@@ -1351,7 +1457,11 @@
     const idxB = parseInt(document.getElementById('rdSelB')?.value ?? 0);
     const platA = platsA[idxA];
     const platB = platsB[idxB];
-    if (!platA || !platB) return;
+    if (!platA || !platB) {
+      const container = document.getElementById('rdTableContainer');
+      if (container) container.innerHTML = '<div class="rd-warning">⚠️ 請先確認兩側都已成功解析平台資料</div>';
+      return;
+    }
 
     const FIELDS = [
       { key: 'headCounts', label: 'Head Counts' },
