@@ -317,6 +317,48 @@
     /* Alternating data rows */
     .odm-data-even td { background: rgba(255,255,255,.02); }
 
+    /* ── ODM RD Resource 比對 ────────────────────────────────── */
+    .rd-selector {
+      display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end;
+      padding: 16px 20px; background: rgba(255,255,255,.02);
+      border-bottom: 1px solid rgba(255,255,255,.07); margin-bottom: 0;
+    }
+    .rd-selector label { font-size: .8rem; color: #94a3b8; display: block; margin-bottom: 5px; }
+    .rd-select {
+      background: #1e293b; color: #e2e8f0;
+      border: 1px solid #334155; border-radius: 8px;
+      padding: 7px 12px; font-size: .85rem; min-width: 260px;
+    }
+    .rd-select:focus { outline: none; border-color: #60a5fa; }
+    .rd-table-wrap { overflow-x: auto; padding: 16px 20px; }
+    .rd-table {
+      width: 100%; border-collapse: collapse; font-size: .8rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .rd-table th {
+      background: rgba(255,255,255,.06); color: #94a3b8;
+      padding: 7px 10px; text-align: center; border: 1px solid rgba(255,255,255,.07);
+      font-size: .75rem; white-space: nowrap;
+    }
+    .rd-table td {
+      padding: 6px 10px; border: 1px solid rgba(255,255,255,.06);
+      color: #e2e8f0; text-align: right; white-space: nowrap;
+    }
+    .rd-table td:first-child { text-align: left; color: #cbd5e1; font-family: 'Noto Sans TC', sans-serif; }
+    .rd-th-a { color: #60a5fa !important; }
+    .rd-th-b { color: #34d399 !important; }
+    .rd-row-diff td { background: rgba(253,224,71,.08) !important; }
+    .rd-row-diff td:first-child { background: rgba(253,224,71,.08) !important; }
+    .rd-cell-diff-a { color: #60a5fa !important; font-weight: 700; }
+    .rd-cell-diff-b { color: #34d399 !important; font-weight: 700; }
+    .rd-total-row td {
+      background: rgba(251,191,36,.10) !important;
+      border-top: 2px solid rgba(251,191,36,.35) !important;
+      color: #fbbf24 !important; font-weight: 700;
+    }
+    .rd-only-a td { color: #60a5fa; font-style: italic; }
+    .rd-only-b td { color: #34d399; font-style: italic; }
+
     /* ── 版本資訊列 ──────────────────────────────── */
     .revision-bar {
       max-width: 900px; margin: -20px auto 20px;
@@ -1134,6 +1176,260 @@
     el.classList.remove('hidden');
   }
 
+  // ══════════════════════════════════════════════════════════════
+  //  ODM RD RESOURCE SPECIAL MODE
+  // ══════════════════════════════════════════════════════════════
+
+  function isOdmRdSheet(name) {
+    return /odm.*rd|rd.*resource/i.test(name);
+  }
+
+  // Detect HQ vs Wistron for RD resource sheet
+  // HQ:      row0 has platform names like "Intel WCL-U"
+  // Wistron: row1 contains "RD resource" label
+  function detectOdmRdFormat(data) {
+    const row1 = data[1] || [];
+    if (row1.some(c => /rd\s*resource/i.test(String(c ?? '')))) return 'wistron';
+    const row0 = data[0] || [];
+    if (row0.some(c => /intel|qualcomm/i.test(String(c ?? '')))) return 'hq';
+    return 'unknown';
+  }
+
+  // Extract a short keyword for fuzzy platform matching
+  function rdKeyword(name) {
+    const n = (name || '').toUpperCase();
+    if (/\bWCL\b/.test(n))                           return 'WCL';
+    if (/\bPTL\b/.test(n))                           return 'PTL';
+    if (/\bNVL\b/.test(n))                           return 'NVL';
+    if (/\bPURWA\b/.test(n))                         return 'PURWA';
+    if (/\bFLIP\b/.test(n) || /\bMARINA\b/.test(n)) return 'MARINA';
+    if (/\bQUALCOMM\b/.test(n))                      return 'QUALCOMM';
+    return null;
+  }
+
+  // Parse platforms from RD resource sheet
+  // Returns [{ name, rows:[{jobFunc,headCounts,senior,seniorCost,junior,juniorCost,dedication,timeLen,totalCost}], totalAmt }]
+  function parseOdmRdPlatforms(data, fmt) {
+    const platforms = [];
+
+    if (fmt === 'hq') {
+      // Row 0: platform names at group-start columns
+      // Groups: col0-8 (data), col9-17 (gap), col18-26 (data)… step=18
+      // Platform name is at the START col of the group
+      const row0 = data[0] || [];
+      for (let c = 0; c < row0.length; c++) {
+        const name = String(row0[c] ?? '').trim();
+        if (!name) continue;
+        if (!/intel|qualcomm|wcl|ptl|nvl|purwa|flip|marina/i.test(name)) continue;
+        const startCol = c;
+        const rows = [];
+        let totalAmt = null;
+        for (let r = 6; r < data.length; r++) {
+          const row = data[r] || [];
+          const jobFunc = String(row[startCol] ?? '').trim();
+          if (!jobFunc) continue;
+          if (/^total/i.test(jobFunc)) {
+            totalAmt = parseNum(row[startCol + 8]);
+            break;
+          }
+          rows.push({
+            jobFunc,
+            headCounts: parseNum(row[startCol + 1]),
+            senior:     parseNum(row[startCol + 2]),
+            seniorCost: parseNum(row[startCol + 3]),
+            junior:     parseNum(row[startCol + 4]),
+            juniorCost: parseNum(row[startCol + 5]),
+            dedication: parseNum(row[startCol + 6]),
+            timeLen:    parseNum(row[startCol + 7]),
+            totalCost:  parseNum(row[startCol + 8]),
+          });
+        }
+        if (rows.length > 0 || totalAmt !== null) platforms.push({ name, rows, totalAmt });
+      }
+    } else {
+      // Wistron: row1 (index 1) has platform names
+      // Group 1: col0-8, platform name at col8
+      // Group 2: col11-19, platform name at col19 (gap=2 between groups)
+      // So: scan row1 for non-empty, non-"RD resource" cells → nameCol
+      // groupStart = nameCol - 8
+      const row1 = data[1] || [];
+      for (let c = 0; c < row1.length; c++) {
+        const name = String(row1[c] ?? '').trim();
+        if (!name || /rd\s*resource/i.test(name)) continue;
+        const startCol = c - 8;
+        if (startCol < 0) continue;
+        const rows = [];
+        let totalAmt = null;
+        for (let r = 3; r < data.length; r++) {
+          const row = data[r] || [];
+          const jobFunc = String(row[startCol] ?? '').trim();
+          if (!jobFunc) continue;
+          if (/^total/i.test(jobFunc)) {
+            totalAmt = parseNum(row[startCol + 8]);
+            break;
+          }
+          rows.push({
+            jobFunc,
+            headCounts: parseNum(row[startCol + 1]),
+            senior:     parseNum(row[startCol + 2]),
+            seniorCost: parseNum(row[startCol + 3]),
+            junior:     parseNum(row[startCol + 4]),
+            juniorCost: parseNum(row[startCol + 5]),
+            dedication: parseNum(row[startCol + 6]),
+            timeLen:    parseNum(row[startCol + 7]),
+            totalCost:  parseNum(row[startCol + 8]),
+          });
+        }
+        if (rows.length > 0 || totalAmt !== null) platforms.push({ name, rows, totalAmt });
+      }
+    }
+
+    return platforms;
+  }
+
+  // ── Render ODM RD Resource ────────────────────────────────────
+  function renderOdmRd(data1, data2, sheetName, nameA, nameB) {
+    const fmtA = detectOdmRdFormat(data1);
+    const fmtB = detectOdmRdFormat(data2);
+    const platsA = parseOdmRdPlatforms(data1, fmtA);
+    const platsB = parseOdmRdPlatforms(data2, fmtB);
+
+    // Auto-match B platform to A platform by keyword
+    const autoMatchB = (platA) => {
+      const ka = rdKeyword(platA.name);
+      return platsB.findIndex(b => ka && rdKeyword(b.name) === ka);
+    };
+
+    // Store state globally for selector callbacks
+    window._rdState = { platsA, platsB, nameA, nameB, fmtA, fmtB };
+
+    const selOptsA = platsA.map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('');
+    const selOptsB = platsB.map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('');
+
+    const initB = platsA.length > 0 ? autoMatchB(platsA[0]) : 0;
+    const initBVal = initB >= 0 ? initB : 0;
+
+    const html = `
+      <div class="stats-bar">
+        <div class="stat-card"><div class="stat-number" style="color:#60a5fa">${platsA.length}</div><div class="stat-label">${esc(nameA)} 平台數（${fmtA}）</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:#34d399">${platsB.length}</div><div class="stat-label">${esc(nameB)} 平台數（${fmtB}）</div></div>
+      </div>
+      <div class="section" style="padding:0;">
+        <div class="section-title" style="padding:14px 20px 0">📐 工作表「${esc(sheetName)}」RD Resource 比對</div>
+        <div class="rd-selector">
+          <div>
+            <label>🔵 ${esc(nameA)} 平台</label>
+            <select class="rd-select" id="rdSelA" onchange="updateRdComparison()">
+              ${selOptsA}
+            </select>
+          </div>
+          <div>
+            <label>🟢 ${esc(nameB)} 平台</label>
+            <select class="rd-select" id="rdSelB" onchange="updateRdComparison()">
+              ${selOptsB}
+            </select>
+          </div>
+        </div>
+        <div id="rdTableContainer" class="rd-table-wrap"></div>
+      </div>`;
+
+    const el = document.getElementById('results');
+    el.innerHTML = html;
+    el.classList.remove('hidden');
+
+    // Set auto-matched B selection then render
+    const selB = document.getElementById('rdSelB');
+    if (selB) selB.value = initBVal;
+    updateRdComparison();
+  }
+
+  // Called when selectors change
+  window.updateRdComparison = function() {
+    const { platsA, platsB, nameA, nameB } = window._rdState || {};
+    if (!platsA) return;
+    const idxA = parseInt(document.getElementById('rdSelA')?.value ?? 0);
+    const idxB = parseInt(document.getElementById('rdSelB')?.value ?? 0);
+    const platA = platsA[idxA];
+    const platB = platsB[idxB];
+    if (!platA || !platB) return;
+
+    const FIELDS = [
+      { key: 'headCounts', label: 'Head Counts' },
+      { key: 'senior',     label: 'Senior HC' },
+      { key: 'seniorCost', label: 'Senior Unit Cost' },
+      { key: 'junior',     label: 'Junior HC' },
+      { key: 'juniorCost', label: 'Junior Unit Cost' },
+      { key: 'dedication', label: 'Dedication%' },
+      { key: 'timeLen',    label: 'Time (months)' },
+      { key: 'totalCost',  label: 'Total Cost' },
+    ];
+
+    // Map rows by normalised job function
+    const normJob = s => String(s ?? '').trim().toLowerCase();
+    const mapA = new Map(platA.rows.map(r => [normJob(r.jobFunc), r]));
+    const mapB = new Map(platB.rows.map(r => [normJob(r.jobFunc), r]));
+    const allJobs = [...new Map([...platA.rows, ...platB.rows].map(r => [normJob(r.jobFunc), r.jobFunc])).entries()];
+
+    const fmtV = v => (v === null || v === undefined) ? '—' : (typeof v === 'number' ? v.toLocaleString() : String(v));
+
+    let tbody = '';
+    let diffCount = 0;
+    for (const [nj, label] of allJobs) {
+      const ra = mapA.get(nj);
+      const rb = mapB.get(nj);
+      const rowCls = !ra ? 'rd-only-b' : !rb ? 'rd-only-a' : '';
+      let hasDiff = !ra || !rb;
+      const cells = [`<td>${esc(label)}</td>`];
+      for (const { key } of FIELDS) {
+        const va = ra?.[key] ?? null;
+        const vb = rb?.[key] ?? null;
+        const diff = va !== vb;
+        if (diff) hasDiff = true;
+        cells.push(`<td class="${diff && ra && rb ? 'rd-cell-diff-a' : ''}">${esc(fmtV(va))}</td>`);
+        cells.push(`<td class="${diff && ra && rb ? 'rd-cell-diff-b' : ''}">${esc(fmtV(vb))}</td>`);
+      }
+      if (hasDiff) diffCount++;
+      tbody += `<tr class="${rowCls || (hasDiff ? 'rd-row-diff' : '')}">${cells.join('')}</tr>`;
+    }
+
+    // Total row
+    const tDiff = platA.totalAmt !== platB.totalAmt;
+    const totalCells = [`<td><strong>Total Amount</strong></td>`];
+    for (const { key } of FIELDS) {
+      if (key !== 'totalCost') {
+        totalCells.push('<td></td><td></td>');
+      } else {
+        totalCells.push(`<td class="${tDiff ? 'rd-cell-diff-a' : ''}">${esc(fmtV(platA.totalAmt))}</td>`);
+        totalCells.push(`<td class="${tDiff ? 'rd-cell-diff-b' : ''}">${esc(fmtV(platB.totalAmt))}</td>`);
+      }
+    }
+    tbody += `<tr class="rd-total-row">${totalCells.join('')}</tr>`;
+
+    // Header
+    const subHdrs = FIELDS.map(f =>
+      `<th class="rd-th-a">${esc(nameA)}</th><th class="rd-th-b">${esc(nameB)}</th>`
+    ).join('');
+    const mainHdrs = FIELDS.map(f => `<th colspan="2">${esc(f.label)}</th>`).join('');
+
+    // Diff summary
+    const totalDiffTxt = tDiff
+      ? ` ／ Total Cost 差異：${esc(fmtV(platA.totalAmt))} vs ${esc(fmtV(platB.totalAmt))}`
+      : ' ／ Total Cost 一致';
+    const summary = `<div style="padding:10px 20px 16px;font-size:.8rem;color:#94a3b8;">
+      差異行：<span style="color:#fbbf24;font-weight:700;">${diffCount}</span> 行${totalDiffTxt}
+    </div>`;
+
+    document.getElementById('rdTableContainer').innerHTML = `
+      <table class="rd-table">
+        <thead>
+          <tr><th rowspan="2">Job Function</th>${mainHdrs}</tr>
+          <tr>${subHdrs}</tr>
+        </thead>
+        <tbody>${tbody}</tbody>
+      </table>
+      ${summary}`;
+  };
+
   // ── Read revision info from "Revision" sheet ─────────────────
   // Returns { ver, date } from the last non-empty row; col 0 = version, col 2 = date
   function getRevisionInfo(wb) {
@@ -1167,9 +1463,10 @@
 
     setTimeout(() => {
       try {
-        const isOdm = isOdmIurSheet(sheetName);
-        const data1 = isOdm ? getRawSheetRows(workbooks[1], sheetName) : getSheetData(workbooks[1], sheetName);
-        const data2 = isOdm ? getRawSheetRows(workbooks[2], sheetName) : getSheetData(workbooks[2], sheetName);
+        const isOdm   = isOdmIurSheet(sheetName);
+        const isOdmRd = isOdmRdSheet(sheetName);
+        const data1 = (isOdm || isOdmRd) ? getRawSheetRows(workbooks[1], sheetName) : getSheetData(workbooks[1], sheetName);
+        const data2 = (isOdm || isOdmRd) ? getRawSheetRows(workbooks[2], sheetName) : getSheetData(workbooks[2], sheetName);
         const nameA = document.getElementById('customName1')?.value?.trim() || '檔案A';
         const nameB = document.getElementById('customName2')?.value?.trim() || '檔案B';
 
@@ -1189,7 +1486,9 @@
         }
 
         document.getElementById('loadingEl').classList.add('hidden');
-        if (isOdm) {
+        if (isOdmRd) {
+          renderOdmRd(data1, data2, sheetName, nameA, nameB);
+        } else if (isOdm) {
           const result = compareOdmIur(data1, data2);
           renderOdmIur(result, sheetName, nameA, nameB);
         } else {
