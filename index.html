@@ -946,27 +946,38 @@
     }
     const qcomBlocksW = blocks.filter(b => b.chipset === 'qcom');
     console.log('[Wistron] Intel 平台數:', blocks.filter(b => !b.chipset).length, '| Qualcomm 平台數:', qcomBlocksW.length);
-    console.log('[Wistron] qualcommPlatforms:', qcomBlocksW.map(b => b.header + '(items:' + b.items.length + ')'));
 
-    // Grand Total = 所有 Intel 平台項目加總 + 所有 Qualcomm 平台項目加總
-    // 用 items.totalAmt 加總（而非 subtotalAmt），因為 subtotalAmt 來自 Sheet 小計行，含 Free Sample (CPU)
-    // 三道過濾：SKIP_0/SKIP_9 → items push 時 .includes 檢查 → Grand Total 計算時再 .includes 過濾
-    const isExcluded = p => p.includes('Free Sample') || p.includes('ODM IUR');
+    // ── 重新計算各平台 subtotalAmt（排除 Free Sample / ODM IUR）──
+    // sheet 小計行（ODM IUR 彙總行）的值含 Free Sample (CPU)，故改用 items 加總覆寫
+    const isExcluded = p => String(p ?? '').toLowerCase().includes('free sample') ||
+                            String(p ?? '').toLowerCase().includes('odm iur');
+
     const intelBlocks = blocks.filter(b => !b.chipset);
+    intelBlocks.forEach(b => {
+      b.items.forEach(it => console.log(`  [Intel/${b.header}] item: ${it.platform}, total: ${it.totalAmt}`));
+      b.subtotalAmt = b.items
+        .filter(it => !isExcluded(it.platform))
+        .reduce((s, it) => s + (it.totalAmt ?? 0), 0);
+      console.log(`平台 ${b.header} 重新計算小計: ${b.subtotalAmt}`);
+    });
+
+    qcomBlocksW.forEach(b => {
+      b.items.forEach(it => console.log(`  [Qcom/${b.header}] item: ${it.platform}, total: ${it.totalAmt}`));
+      b.subtotalAmt = b.items
+        .filter(it => !isExcluded(it.platform))
+        .reduce((s, it) => s + (it.totalAmt ?? 0), 0);
+      console.log(`平台 ${b.header} 重新計算小計: ${b.subtotalAmt}`);
+    });
+
+    // Grand Total = 重新計算後的各平台 subtotalAmt 加總
     console.log('=== Wistron Grand Total 計算明細 ===');
-    const intelGrandTotal = intelBlocks.reduce((s, b) => {
-      const subtotal = b.items
-        .filter(it => !isExcluded(String(it.platform ?? '')))
-        .reduce((ss, it) => ss + (it.totalAmt ?? 0), 0);
-      console.log(`加入 Intel 平台小計 [${b.header}]: ${subtotal}`, '(items:', b.items.map(it => it.platform + '=' + it.totalAmt), ')');
-      return s + subtotal;
+    const intelGrandTotal    = intelBlocks.reduce((s, b) => {
+      console.log(`加入 Intel 平台小計 [${b.header}]: ${b.subtotalAmt}`);
+      return s + (b.subtotalAmt ?? 0);
     }, 0);
     const qualcommGrandTotal = qcomBlocksW.reduce((s, b) => {
-      const subtotal = b.items
-        .filter(it => !isExcluded(String(it.platform ?? '')))
-        .reduce((ss, it) => ss + (it.totalAmt ?? 0), 0);
-      console.log(`加入 Qualcomm 平台小計 [${b.header}]: ${subtotal}`, '(items:', b.items.map(it => it.platform + '=' + it.totalAmt), ')');
-      return s + subtotal;
+      console.log(`加入 Qualcomm 平台小計 [${b.header}]: ${b.subtotalAmt}`);
+      return s + (b.subtotalAmt ?? 0);
     }, 0);
     const grandTotal = intelGrandTotal + qualcommGrandTotal;
     console.log(`Intel Grand Total: ${intelGrandTotal}`);
