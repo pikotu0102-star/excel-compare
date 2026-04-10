@@ -1287,27 +1287,110 @@
       if (hdrRowIdx < 0) return platforms;
 
     } else {
-      // ── Wistron: find row with "Job function" label ──
-      for (let r = 0; r < limit15; r++) {
-        const row = data[r] || [];
-        const cols = [];
-        for (let c = 0; c < row.length; c++) {
-          if (/job\s*func/i.test(String(row[c] ?? ''))) cols.push(c);
+      // ══ Wistron: platforms are VERTICALLY stacked ══
+      // Structure per block:
+      //   row N  : platform name at col nameCol (last col of the 9-col group)
+      //   row N+1: column headers (Job function, Senior, Junior…)
+      //   row N+2+: data rows
+      //   row ?  : "Total amount" row → marks end of block
+      //
+      // Two horizontal groups may coexist on the same rows:
+      //   Group A (Intel):    cols 0-8,  name at col 8
+      //   Group B (Qualcomm): cols ~9-17, name at col ~17
+      // Both groups are detected by scanning ALL rows.
+
+      const seenKeys = new Set();
+
+      for (let r = 0; r < data.length - 1; r++) {
+        const row     = data[r] || [];
+        const nextRow = data[r + 1] || [];
+
+        // Scan every column in this row for a platform keyword
+        for (let nameCol = 0; nameCol < row.length; nameCol++) {
+          const v = String(row[nameCol] ?? '').trim();
+          if (!v || !platKw.test(v)) continue;
+
+          const startCol = nameCol - 8;
+          if (startCol < 0) continue;
+
+          // Verify: the immediately following row must look like column headers
+          // (at least 2 of: Job function / Senior / Junior / Head count / Dedication / Total)
+          const colHdrKwLocal = /job\s*func|head\s*count|senior|junior|dedic|total/i;
+          const hdrHits = nextRow.slice(startCol, nameCol + 1)
+                                 .filter(c => colHdrKwLocal.test(String(c ?? ''))).length;
+          if (hdrHits < 2) continue;
+
+          // Dedup: skip if we've already parsed this platform name
+          const key = `${v}|${startCol}`;
+          if (seenKeys.has(key)) continue;
+          seenKeys.add(key);
+
+          // Build column map from nextRow[startCol..nameCol]
+          const cm = { jobFunc: startCol };
+          let unitCostCount = 0;
+          for (let c = startCol; c <= nameCol; c++) {
+            const h = String(nextRow[c] ?? '').trim().toLowerCase();
+            if (!h) continue;
+            if (c === startCol) continue;  // startCol = "Job function" col, already set
+            if (!cm.headCounts && /total\s*head|head\s*count/i.test(h))      { cm.headCounts = c; continue; }
+            if (!cm.senior    && /senior/i.test(h) && !/cost|unit/i.test(h)) { cm.senior     = c; continue; }
+            if (!cm.junior    && /junior/i.test(h) && !/cost|unit/i.test(h)) { cm.junior     = c; continue; }
+            if (/unit\s*cost|unit\s*price/i.test(h)) {
+              unitCostCount++;
+              if (unitCostCount === 1 && !cm.seniorCost) { cm.seniorCost = c; continue; }
+              if (unitCostCount === 2 && !cm.juniorCost) { cm.juniorCost = c; continue; }
+            }
+            if (!cm.dedication && /dedic/i.test(h))                         { cm.dedication = c; continue; }
+            if (!cm.timeLen    && /time|length|month/i.test(h))             { cm.timeLen    = c; continue; }
+            if (!cm.totalCost  && /total\s*(cost|amount)/i.test(h))         { cm.totalCost  = c; continue; }
+          }
+          // Fallback to fixed offsets
+          if (!cm.headCounts) cm.headCounts = startCol + 1;
+          if (!cm.senior)     cm.senior     = startCol + 2;
+          if (!cm.seniorCost) cm.seniorCost = startCol + 3;
+          if (!cm.junior)     cm.junior     = startCol + 4;
+          if (!cm.juniorCost) cm.juniorCost = startCol + 5;
+          if (!cm.dedication) cm.dedication = startCol + 6;
+          if (!cm.timeLen)    cm.timeLen    = startCol + 7;
+          if (!cm.totalCost)  cm.totalCost  = nameCol;  // last col of group
+
+          // Read data rows from r+2 until "Total amount" or empty block
+          const rows = [];
+          let totalAmt = null;
+          for (let dr = r + 2; dr < data.length; dr++) {
+            const drow    = data[dr] || [];
+            const jobFunc = String(drow[cm.jobFunc] ?? '').trim();
+            if (!jobFunc) continue;
+            if (/^total/i.test(jobFunc)) { totalAmt = parseNum(drow[cm.totalCost]); break; }
+            rows.push({
+              jobFunc,
+              headCounts: parseNum(drow[cm.headCounts]),
+              senior:     parseNum(drow[cm.senior]),
+              seniorCost: parseNum(drow[cm.seniorCost]),
+              junior:     parseNum(drow[cm.junior]),
+              juniorCost: parseNum(drow[cm.juniorCost]),
+              dedication: parseNum(drow[cm.dedication]),
+              timeLen:    parseNum(drow[cm.timeLen]),
+              totalCost:  parseNum(drow[cm.totalCost]),
+            });
+          }
+
+          if (rows.length > 0 || totalAmt !== null) {
+            platforms.push({ name: v, rows, totalAmt, _colMap: cm });
+          }
         }
-        if (cols.length > 0) { hdrRowIdx = r; groupStartCols = cols; break; }
       }
-      if (hdrRowIdx < 0) return platforms;
+      return platforms;
     }
 
-    const hdrRow      = data[hdrRowIdx] || [];
+    // ── HQ: for each platform group: build colMap, get name, read data rows ──
+    const hdrRow       = data[hdrRowIdx] || [];
     const dataStartRow = hdrRowIdx + 1;
 
-    // ── For each platform group: build colMap, get platform name, read data rows ──
     for (let gi = 0; gi < groupStartCols.length; gi++) {
-      const startCol    = groupStartCols[gi];
+      const startCol     = groupStartCols[gi];
       const nextGroupCol = groupStartCols[gi + 1] ?? (startCol + 50);
 
-      // Build column map by scanning header labels
       const cm = { jobFunc: startCol };
       let unitCostCount = 0;
       for (let c = startCol + 1; c < nextGroupCol && c < hdrRow.length; c++) {
@@ -1325,7 +1408,6 @@
         if (!cm.timeLen    && /time|length|month/i.test(h))              { cm.timeLen    = c; continue; }
         if (!cm.totalCost  && /total\s*(cost|amount)/i.test(h))          { cm.totalCost  = c; continue; }
       }
-      // Fallback to fixed offsets
       if (!cm.headCounts) cm.headCounts = startCol + 1;
       if (!cm.senior)     cm.senior     = startCol + 2;
       if (!cm.seniorCost) cm.seniorCost = startCol + 3;
@@ -1335,25 +1417,10 @@
       if (!cm.timeLen)    cm.timeLen    = startCol + 7;
       if (!cm.totalCost)  cm.totalCost  = startCol + 8;
 
-      // Get platform name
-      let platName = '';
-      if (fmt === 'hq') {
-        // Platform name is directly in the platform header row at startCol
-        platName = String(data[platHdrRowIdx]?.[startCol] ?? '').trim();
-      } else {
-        // Wistron: scan rows above hdrRowIdx for a platform keyword near startCol
-        for (let r = 0; r < hdrRowIdx && !platName; r++) {
-          const row = data[r] || [];
-          for (const c of [startCol, cm.totalCost, startCol + 1, startCol - 1]) {
-            if (c < 0) continue;
-            const v = String(row[c] ?? '').trim();
-            if (v && platKw.test(v)) { platName = v; break; }
-          }
-        }
-      }
+      // HQ: platform name is in the platform header row at startCol
+      const platName = String(data[platHdrRowIdx]?.[startCol] ?? '').trim();
       if (!platName) continue;
 
-      // Read data rows
       const rows = [];
       let totalAmt = null;
       for (let r = dataStartRow; r < data.length; r++) {
