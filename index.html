@@ -1050,22 +1050,7 @@
   //   4. 垂直堆疊（同一群組多個平台）自然處理
   // ══════════════════════════════════════════════════════════════
   function parseOdmRdPlatforms(data) {
-    // Unified parser: works for both HQ and Wistron formats
-    // Key insight from actual Excel analysis:
-    //   HQ:      Two groups side by side per section
-    //            Left  (cols 0-8):  col 0  = "RD resource - WaveN", col 6/7 = Intel platform name
-    //            Right (cols 10-18): col 10 = "RD resource - WaveN", col 16  = Qualcomm platform name
-    //   Wistron: Single or multiple groups stacked vertically
-    //            col 0 empty + col 8 = platform name (Wistron style)
-    //
-    // Algorithm:
-    //   1. Find all "Total cost amount" endCols (col 8, col 18 for HQ; col 8 for Wistron)
-    //   2. For each endCol group (startCol = endCol-8):
-    //      - If row[startCol] has "RD resource -" → HQ Wave header → find platform name
-    //      - If row[startCol] is empty + row[endCol] has platform keyword → Wistron header
-    //   3. Read data rows until "Total amount" row
-
-    const PLAT_KW   = /intel|qualcomm|wcl|ptl|nvl|purwa|flip|marina|mahua|kalambo/i;
+    const PLAT_KW       = /intel|qualcomm|wcl|ptl|nvl|purwa|flip|marina|mahua|kalambo/i;
     const TOTAL_COST_KW = /total\s*cost\s*amount|total\s*cost/i;
     const JOB_FUNC_KW   = /^job\s*(function|func)/i;
     const TOTAL_AMT_KW  = /^total\s*(amount|amt)/i;
@@ -1074,7 +1059,7 @@
 
     const platforms = [];
 
-    // Step 1: Find all endCols by scanning first 10 rows
+    // Find all endCols (columns with "Total cost amount" header)
     const endCols = new Set();
     for (let r = 0; r < Math.min(data.length, 10); r++) {
       const row = data[r] || [];
@@ -1084,7 +1069,7 @@
     }
     if (endCols.size === 0) endCols.add(8);
 
-    // Step 2: For each endCol group, scan all rows
+    // Process each column group independently
     for (const endCol of [...endCols].sort((a, b) => a - b)) {
       const startCol = endCol - 8;
       if (startCol < 0) continue;
@@ -1102,9 +1087,10 @@
         if (RD_WAVE_KW.test(s0)) {
           if (currentPlat && (currentPlat.rows.length > 0 || currentPlat.totalAmt !== null))
             platforms.push(currentPlat);
-          // Find platform name: scan ENTIRE row, take LAST match (skips "Same as Intel ID")
+          // Scan ONLY this group's columns (startCol to endCol) for platform name
+          // Take the LAST match to skip "Same as Intel ID"
           let platName = null;
-          for (let c = 0; c < row.length; c++) {
+          for (let c = startCol; c <= endCol; c++) {
             const v = String(row[c] != null ? row[c] : '').trim();
             if (v && PLAT_KW.test(v) && !EXCLUDE_KW.test(v)) platName = v;
           }
@@ -1124,7 +1110,7 @@
 
         if (!currentPlat) continue;
 
-        // Field header row: detect field offsets
+        // Field header row
         if (JOB_FUNC_KW.test(s0)) {
           fo = { headCounts:1, senior:2, seniorCost:3, junior:4, juniorCost:5, dedication:6, timeLen:7, totalCost:8 };
           for (let c = startCol + 1; c <= endCol; c++) {
@@ -1149,7 +1135,7 @@
         if (TOTAL_AMT_KW.test(s0)) {
           currentPlat.totalAmt = parseNum(row[startCol + fo.totalCost]);
           inData = false;
-          continue; // Don't break - vertical stacking may have more platforms
+          continue;
         }
 
         // Data row
@@ -1167,11 +1153,9 @@
           });
         }
       }
-
       if (currentPlat && (currentPlat.rows.length > 0 || currentPlat.totalAmt !== null))
         platforms.push(currentPlat);
     }
-
     return platforms;
   }
   // ── 生成 Raw Table（fallback 或 debug 用）────────────────────
