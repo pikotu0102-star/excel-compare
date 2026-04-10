@@ -498,26 +498,23 @@
     const nameA = document.getElementById('customName1')?.value?.trim() || '檔案A';
     const nameB = document.getElementById('customName2')?.value?.trim() || '檔案B';
 
-    // Build sheetNameMap { s1Name → s2Name }:
-    //   1. Exact match first
-    //   2. Case-insensitive match for remaining (e.g. "ODM RD resource" ↔ "ODM RD Resource")
-    const sheetNameMap = {};
-    const usedS2 = new Set();
+    // Case-insensitive matching
+    const s2lower = s2.map(s => s.trim().toLowerCase());
+    const s1lower = s1.map(s => s.trim().toLowerCase());
 
-    for (const n of s1) {
-      if (s2.includes(n)) { sheetNameMap[n] = n; usedS2.add(n); }
-    }
-    for (const n of s1) {
-      if (sheetNameMap[n]) continue;
-      const match = s2.find(n2 => !usedS2.has(n2) && n.toLowerCase() === n2.toLowerCase());
-      if (match) { sheetNameMap[n] = match; usedS2.add(match); }
+    const common = s1.filter(s => s2lower.includes(s.trim().toLowerCase()));
+    const aOnly  = s1.filter(s => !s2lower.includes(s.trim().toLowerCase()));
+    const bOnly  = s2.filter(s => !s1lower.includes(s.trim().toLowerCase()));
+
+    // Build sheetNameMap { dropdownKey(=s1Name): { wb1: actualS1Name, wb2: actualS2Name } }
+    const sheetNameMap = {};
+    for (const n1 of common) {
+      const n2 = s2[s2lower.indexOf(n1.trim().toLowerCase())];
+      sheetNameMap[n1] = { wb1: n1, wb2: n2 };
     }
     window._sheetNameMap = sheetNameMap;
 
-    const common   = Object.keys(sheetNameMap);            // s1 names with any match
-    const aOnly    = s1.filter(n => !sheetNameMap[n]);
-    const bOnly    = s2.filter(n2 => !usedS2.has(n2));
-    const s2Common = common.map(n => sheetNameMap[n]);     // corresponding s2 names
+    const s2Common = common.map(n => sheetNameMap[n].wb2);
 
     const chips = (arr, cls) => arr.map(s => `<span class="sheet-chip ${cls}">${esc(s)}</span>`).join('');
     document.getElementById('sheetSummaryInner').innerHTML = `
@@ -539,9 +536,9 @@
     `;
     document.getElementById('sheetSummaryEl').classList.remove('hidden');
     const sel = document.getElementById('sheetSelect');
-    // Dropdown value = s1 name; label notes when s2 name differs
+    // Dropdown value = s1 name; label shows s2 name if different
     sel.innerHTML = common.map(n => {
-      const n2 = sheetNameMap[n];
+      const n2 = sheetNameMap[n].wb2;
       const label = n === n2 ? n : `${n}  (B: ${n2})`;
       return `<option value="${esc(n)}">${esc(label)}</option>`;
     }).join('');
@@ -1623,8 +1620,10 @@
   function startCompare() {
     const sheetName  = document.getElementById('sheetSelect').value;
     if (!sheetName || !workbooks[1] || !workbooks[2]) return;
-    // sheetName is always the s1 (file A) name; look up the corresponding s2 (file B) name
-    const sheetName2 = window._sheetNameMap?.[sheetName] ?? sheetName;
+    // Look up actual sheet names for each workbook via sheetNameMap
+    const _map   = window._sheetNameMap?.[sheetName];
+    const name1  = _map?.wb1 ?? sheetName;
+    const name2  = _map?.wb2 ?? sheetName;
     const btn = document.getElementById('compareBtn');
     btn.disabled = true; btn.textContent = '⏳ 比對中...';
     document.getElementById('loadingEl').classList.remove('hidden');
@@ -1634,8 +1633,8 @@
       try {
         const isOdm   = isOdmIurSheet(sheetName);
         const isOdmRd = isOdmRdSheet(sheetName);
-        const data1 = (isOdm || isOdmRd) ? getRawSheetRows(workbooks[1], sheetName)  : getSheetData(workbooks[1], sheetName);
-        const data2 = (isOdm || isOdmRd) ? getRawSheetRows(workbooks[2], sheetName2) : getSheetData(workbooks[2], sheetName2);
+        const data1 = (isOdm || isOdmRd) ? getRawSheetRows(workbooks[1], name1) : getSheetData(workbooks[1], name1);
+        const data2 = (isOdm || isOdmRd) ? getRawSheetRows(workbooks[2], name2) : getSheetData(workbooks[2], name2);
         const nameA = document.getElementById('customName1')?.value?.trim() || '檔案A';
         const nameB = document.getElementById('customName2')?.value?.trim() || '檔案B';
 
