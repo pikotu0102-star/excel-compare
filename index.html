@@ -1227,8 +1227,12 @@
     const idx = parseInt(document.getElementById('toolingPlatSel')?.value ?? 0);
     const { pA, pB, displayName } = allPlats[idx] || {};
 
-    const fmtN = v => (v === null || v === undefined) ? '—'
-      : Number(v).toLocaleString('zh-TW', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    const fmtN = (v, other) => {
+      if (v === null || v === undefined) {
+        return (other !== null && other !== undefined) ? '0' : '—';
+      }
+      return Number(v).toLocaleString('zh-TW', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    };
     const diffCls = (a, b) => {
       if (a === null && b === null) return '';
       const d = (a ?? 0) - (b ?? 0);
@@ -1284,8 +1288,8 @@
       const diff = (a ?? 0) !== (b ?? 0);
       sumRows += `<tr ${diff ? 'class="rd-row-diff"' : ''}>
         <td style="font-family:'Noto Sans TC',sans-serif;color:#cbd5e1">${esc(label)}</td>
-        <td class="${diff && a !== null && b !== null ? 'rd-cell-diff-a' : ''}">${esc(fmtN(a))}</td>
-        <td class="${diff && a !== null && b !== null ? 'rd-cell-diff-b' : ''}">${esc(fmtN(b))}</td>
+        <td class="${diff && a !== null && b !== null ? 'rd-cell-diff-a' : ''}">${esc(fmtN(a, b))}</td>
+        <td class="${diff && a !== null && b !== null ? 'rd-cell-diff-b' : ''}">${esc(fmtN(b, a))}</td>
         <td class="${diffCls(a,b)}">${esc(fmtDiff(a,b))}</td>
       </tr>`;
     }
