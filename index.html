@@ -1106,8 +1106,9 @@
       }
 
       // Only keep Flip/X360 platform groups (filter out PAV, Envy, Total: etc.)
-      const isFliPPlat = /flip|x360|qualcomm|intel/i.test(groupName);
-      if (isFliPPlat && (totalFee !== null || items.length > 0)) {
+      const isFlipPlat = /flip|x360|qualcomm|intel/i.test(groupName);
+      const hasData = items.some(i => i.fee !== null && i.fee !== 0) || (totalFee !== null && totalFee !== 0);
+      if (isFlipPlat && hasData) {
         groups.push({ name: groupName || `Group(col${ic})`, totalFee, items });
       }
     }
