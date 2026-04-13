@@ -1079,10 +1079,8 @@
           // Check itemCol and nearby columns for a platform/group name
           for (let dc = -1; dc <= 1; dc++) {
             const v = String(row[itemCol + dc] != null ? row[itemCol + dc] : '').trim();
-            if (v && !/^(name of odm|hp confidential|certification|huaqin|#ref)/i.test(v) &&
-                !/^\d+(\.\d+)?$/.test(v)) {
-              groupName = v.replace(/
-/g, ' ').trim();
+            if (v && !/^(name of odm|hp confidential|certification|huaqin|#ref)/i.test(v) && !/^\d+(\.\d+)?$/.test(v)) {
+              groupName = v.replace(/\n/g, ' ').trim();
               break;
             }
           }
