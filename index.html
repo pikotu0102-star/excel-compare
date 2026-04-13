@@ -1065,7 +1065,8 @@
       const col5 = row[5];
 
       // Platform header: has platform keyword, not in skip list, col3 is empty
-      const isPlatHdr = s0 && PLAT_KW.test(s0) && !TOOLING_SKIP.test(s0) &&
+      const isFlipPlat = /flip/i.test(s0);
+      const isPlatHdr = s0 && PLAT_KW.test(s0) && isFlipPlat && !TOOLING_SKIP.test(s0) &&
         !CHASSIS_KW.test(s0) && !NRE_TOT_KW.test(s0) &&
         !ITEM_KW.test(s0) && !TOOL_MOD_KW.test(s0) &&
         (col3 == null || col3 === '');
