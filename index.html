@@ -1105,10 +1105,12 @@
         if (/^\d+$/.test(no) && desc) items.push({ no, desc, fee });
       }
 
-      // Only keep Flip/X360 platform groups (filter out PAV, Envy, Total: etc.)
-      const isFlipPlat = /flip|x360|qualcomm|intel/i.test(groupName);
-      const hasData = items.some(i => i.fee !== null && i.fee !== 0) || (totalFee !== null && totalFee !== 0);
-      if (isFlipPlat && hasData) {
+      // Only keep groups with real non-zero fee data AND platform keywords
+      const isFlipPlat = /flip|x360|qualcomm|intel/i.test(groupName) &&
+                         !/^(14\.0|15\.6|pav|envy)/i.test(groupName);
+      const hasRealFee = (totalFee !== null && totalFee !== 0) ||
+                          items.some(i => i.fee !== null && i.fee !== 0);
+      if (isFlipPlat && hasRealFee) {
         groups.push({ name: groupName || `Group(col${ic})`, totalFee, items });
       }
     }
@@ -1118,20 +1120,14 @@
 
   function normFuncCertGroup(n) {
     const s = (n || '').toLowerCase().replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-    // WCL (both HQ "Intel WCL-U/R" and Wistron "14"X360 Intel WCL")
-    if (/wcl/.test(s) && /intel/.test(s)) return 'intel_wcl';
-    // PTL
-    if (/ptl/.test(s) && /intel/.test(s)) return 'intel_ptl';
-    // NVL
-    if (/nvl/.test(s) && /intel/.test(s)) return 'intel_nvl';
-    // NextGen / Mainstream / Refresh
-    if (/next.?gen|mainstream|refresh/.test(s) && /intel/.test(s)) return 'intel_nextgen';
-    // Qualcomm group 1: Purwa/Mahua/Kalambo (without refresh)
-    if (/qualcomm/.test(s) && (/purwa|mahua|kalambo/.test(s)) && !/refresh/.test(s)) return 'qcom_main';
-    // Qualcomm group 2: refresh variants
-    if (/qualcomm/.test(s) && /refresh/.test(s)) return 'qcom_refresh';
-    // Qualcomm generic
-    if (/qualcomm/.test(s)) return 'qcom_other';
+    // Normalize platform names for matching
+    if (/flip[_\s]titop.*intel|flip[_\s]marina.*intel|x360.*intel.*wcl/i.test(n)) return 'intel_wcl';
+    if (/x360.*intel.*ptl/i.test(n)) return 'intel_ptl';
+    if (/x360.*intel.*nvl/i.test(n)) return 'intel_nvl';
+    if (/x360.*next.?gen|x360.*refresh/i.test(n)) return 'intel_nextgen';
+    if (/flip[_\s]titop.*qualcomm|flip[_\s]marina.*qualcomm/i.test(n)) return 'qcom_flip';
+    if (/x360.*qualcomm.*(purwa|mahua|kalambo)/i.test(n) && !/refresh/i.test(n)) return 'qcom_main';
+    if (/x360.*qualcomm.*refresh/i.test(n)) return 'qcom_refresh';
     return s;
   }
 
