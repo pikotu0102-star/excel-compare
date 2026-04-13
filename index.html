@@ -1281,7 +1281,7 @@
     ];
     let sumRows = '';
     for (const [label, a, b] of summaryFields) {
-      const diff = a !== b && !(a === null && b === null);
+      const diff = (a ?? 0) !== (b ?? 0);
       sumRows += `<tr ${diff ? 'class="rd-row-diff"' : ''}>
         <td style="font-family:'Noto Sans TC',sans-serif;color:#cbd5e1">${esc(label)}</td>
         <td class="${diff && a !== null && b !== null ? 'rd-cell-diff-a' : ''}">${esc(fmtN(a))}</td>
@@ -1292,7 +1292,7 @@
 
     const badge = !pA ? `<span class="badge badge-added">${esc(nameB)} 獨有</span>`
       : !pB ? `<span class="badge badge-removed">${esc(nameA)} 獨有</span>`
-      : summaryFields.some(([,a,b]) => a !== b && !(a===null&&b===null))
+      : summaryFields.some(([,a,b]) => (a ?? 0) !== (b ?? 0))
         ? '<span class="badge badge-changed">有差異</span>'
         : '<span class="badge" style="background:rgba(52,211,153,.15);color:#34d399">✓ 一致</span>';
 
