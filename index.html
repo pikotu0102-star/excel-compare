@@ -513,8 +513,11 @@
       ${common.length === 0 ? '<div class="sheet-note sheet-note-red">❌ 兩個檔案沒有共同工作表，無法比對</div>' : `<div class="sheet-note" style="color:#a78bfa;background:rgba(139,92,246,.1)">✔ 共同工作表：${common.length} 個</div>`}
     `;
     document.getElementById('sheetSummaryEl').classList.remove('hidden');
+    const HIDE_SHEETS = /^(tooling-|nre cpc tracker)/i;
     const sel = document.getElementById('sheetSelect');
-    sel.innerHTML = common.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+    sel.innerHTML = common
+      .filter(s => !HIDE_SHEETS.test(s.trim()))
+      .map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
     document.getElementById('sheetSelectorEl').classList.toggle('hidden', common.length === 0);
     document.getElementById('compareBtn').disabled = common.length === 0;
   }
@@ -1026,109 +1029,85 @@
   }
 
   // Parse Functional Certification sheet
-  // HQ:      Row 8  = group headers (col1=group name, col2-9=platform names, col13=group2...)
-  //          Row 9  = Total row per group
-  //          Row 12 = Item/Description/Fee headers
-  //          Row 13+= data rows (item#, description, fee per platform col)
+  // HQ:      Row 4  = chip names (WCL-U, PTL-U 404...) per col
+  //          Row 8  = group headers (col1=group label, col2-9=platform names)
+  //          Row 9  = Total per platform
+  //          Row 12 = Item/Description/Fee headers (col0,col12,col22,col27,col32)
+  //          Row 13+= data rows
   //          Row 22 = Total row
-  // Wistron: Row 4  = platform group names (col1, col6, col11, col16, col22, col27)
+  // Wistron: Row 4  = group names (col1,col6,col11,col16,col22,col27)
   //          Row 5  = Total per group
   //          Row 8  = Item/Description/Fee headers
   //          Row 9+ = data rows
   //          Row 18 = Total row
   function parseFuncCert(data) {
-    // Find all platform groups by scanning for "Total:" rows after group headers
-    // Strategy: find rows with "Total:" label + numeric value → those define groups
-    // Then find the Item header row above them
+    const ITEM_HDR  = /^item$/i;
+    const TOTAL_KW  = /^total\s*:?\s*$/i;
+    const SKIP_NAME = /^(name of odm|hp confidential|certification|huaqin|#ref!|total:?)/i;
 
-    const groups = [];   // [{name, totalFee, items:[{no, desc, fee}]}]
-    const ITEM_HDR = /^item$/i;
-    const TOTAL_KW = /^total\s*:?$/i;
+    const groups = [];
 
-    // Find all columns that have "Total:" or "Total :" with a numeric value nearby
-    // and find the corresponding group header above them
-    // Scan all rows to find "Item" header rows → these define group starts
-    let itemHdrRows = [];
+    // Step 1: Find the Item header row (first row where col0 = "Item")
+    let itemHdrRow = -1;
     for (let r = 0; r < data.length; r++) {
-      const row = data[r] || [];
-      if (row.some(v => ITEM_HDR.test(String(v != null ? v : '').trim()))) {
-        itemHdrRows.push(r);
+      if (ITEM_HDR.test(String(data[r]?.[0] ?? '').trim())) {
+        itemHdrRow = r;
+        break;
       }
     }
-    if (itemHdrRows.length === 0) return { groups: [] };
+    if (itemHdrRow === -1) return { groups: [] };
 
-    // For each item header row, find the columns with "Item" label
-    // Each "Item" column defines a group → find group name above it
-    for (const hdrRow of itemHdrRows) {
-      const hdr = data[hdrRow] || [];
-      const itemCols = [];
-      for (let c = 0; c < hdr.length; c++) {
-        if (ITEM_HDR.test(String(hdr[c] != null ? hdr[c] : '').trim())) {
-          itemCols.push(c);
+    const hdr = data[itemHdrRow] || [];
+
+    // Step 2: Find all "Item" columns in that row
+    const itemCols = [];
+    for (let c = 0; c < hdr.length; c++) {
+      if (ITEM_HDR.test(String(hdr[c] ?? '').trim())) itemCols.push(c);
+    }
+
+    // Step 3: For each Item column, find group name by scanning ALL rows ABOVE
+    // looking for the first non-empty, non-skip cell near that column
+    for (const ic of itemCols) {
+      const fc = ic + 2;  // Fee column is always itemCol + 2
+
+      // Find group name: scan upward, skip "Total:" and other noise
+      let groupName = '';
+      for (let r = itemHdrRow - 1; r >= 0 && !groupName; r--) {
+        const row = data[r] || [];
+        for (let dc = 0; dc <= 2 && !groupName; dc++) {
+          const v = String(row[ic + dc] ?? '').replace(/\n/g, ' ').trim();
+          if (v && !SKIP_NAME.test(v) && !/^\d+(\.\d+)?$/.test(v)) {
+            groupName = v;
+          }
         }
       }
 
-      for (const itemCol of itemCols) {
-        const feeCol = itemCol + 2;  // Fee is always 2 cols after Item
-        const descCol = itemCol + 1;
-
-        // Find group name: scan upward from hdrRow, look for non-empty cell in itemCol or itemCol-1
-        let groupName = '';
-        for (let r = hdrRow - 1; r >= Math.max(0, hdrRow - 8); r--) {
-          const row = data[r] || [];
-          // Check itemCol and nearby columns for a platform/group name
-          for (let dc = -1; dc <= 1; dc++) {
-            const v = String(row[itemCol + dc] != null ? row[itemCol + dc] : '').trim();
-            if (v && !/^(name of odm|hp confidential|certification|huaqin|#ref)/i.test(v) && !/^\d+(\.\d+)?$/.test(v)) {
-              groupName = v.replace(/\n/g, ' ').trim();
-              break;
-            }
-          }
-          if (groupName) break;
-        }
-
-        // Find total fee: scan rows for "Total :" label near itemCol
-        let totalFee = null;
-        for (let r = hdrRow + 1; r < Math.min(data.length, hdrRow + 25); r++) {
-          const row = data[r] || [];
-          const label = String(row[itemCol] != null ? row[itemCol] : '').trim() ||
-                        String(row[itemCol + 1] != null ? row[itemCol + 1] : '').trim();
-          if (TOTAL_KW.test(label)) {
-            totalFee = parseNum(row[feeCol]) ?? parseNum(row[feeCol - 1]);
-            break;
-          }
-        }
-
-        // Also check the row just above item header for "Total:" (HQ style)
-        for (let r = Math.max(0, hdrRow - 3); r < hdrRow; r++) {
-          const row = data[r] || [];
-          const label = String(row[itemCol] != null ? row[itemCol] : '').trim() ||
-                        String(row[itemCol + 1] != null ? row[itemCol + 1] : '').trim();
-          if (TOTAL_KW.test(label)) {
-            totalFee = parseNum(row[feeCol]) ?? parseNum(row[feeCol - 1]);
-            break;
-          }
-        }
-
-        // Collect items
-        const items = [];
-        for (let r = hdrRow + 1; r < Math.min(data.length, hdrRow + 25); r++) {
-          const row = data[r] || [];
-          const no = String(row[itemCol] != null ? row[itemCol] : '').trim();
-          if (!no || TOTAL_KW.test(no)) break;
-          if (!/^\d+$/.test(no)) continue;  // item number must be numeric
-          const desc = String(row[descCol] != null ? row[descCol] : '').trim();
-          const fee  = parseNum(row[feeCol]);
-          if (desc || fee !== null) {
-            items.push({ no, desc, fee });
-          }
-        }
-
-        if (groupName || totalFee !== null) {
-          groups.push({ name: groupName || `Group (col${itemCol})`, totalFee, items });
+      // Find total fee: scan downward from item header
+      let totalFee = null;
+      for (let r = itemHdrRow + 1; r < Math.min(data.length, itemHdrRow + 25); r++) {
+        const row = data[r] || [];
+        const l0 = String(row[ic]     ?? '').trim();
+        const l1 = String(row[ic + 1] ?? '').trim();
+        if (TOTAL_KW.test(l0) || TOTAL_KW.test(l1)) {
+          totalFee = parseNum(row[fc]) ?? parseNum(row[fc - 1]);
+          break;
         }
       }
-      break; // Only process first item header row occurrence
+
+      // Collect items
+      const items = [];
+      for (let r = itemHdrRow + 1; r < Math.min(data.length, itemHdrRow + 25); r++) {
+        const row = data[r] || [];
+        const no   = String(row[ic]     ?? '').trim();
+        const desc = String(row[ic + 1] ?? '').trim();
+        const fee  = parseNum(row[fc]);
+        if (TOTAL_KW.test(no)) break;
+        if (/^\d+$/.test(no) && desc) items.push({ no, desc, fee });
+      }
+
+      if (groupName || totalFee !== null || items.length > 0) {
+        groups.push({ name: groupName || `Group(col${ic})`, totalFee, items });
+      }
     }
 
     return { groups };
