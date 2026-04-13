@@ -1105,7 +1105,9 @@
         if (/^\d+$/.test(no) && desc) items.push({ no, desc, fee });
       }
 
-      if (groupName || totalFee !== null || items.length > 0) {
+      // Only keep Flip/X360 platform groups (filter out PAV, Envy, Total: etc.)
+      const isFliPPlat = /flip|x360|qualcomm|intel/i.test(groupName);
+      if (isFliPPlat && (totalFee !== null || items.length > 0)) {
         groups.push({ name: groupName || `Group(col${ic})`, totalFee, items });
       }
     }
@@ -1114,16 +1116,22 @@
   }
 
   function normFuncCertGroup(n) {
-    return (n || '').toLowerCase()
-      .replace(/14[""”]x?360|14[""”]\s*flip[_\s]?(titop|marina)?/gi, '14flip')
-      .replace(/intel\s*/gi, 'intel ')
-      .replace(/qualcomm\s*/gi, 'qualcomm ')
-      .replace(/wcl[-\s]?u?/gi, 'wcl')
-      .replace(/ptl[-\s]?(u|h)?[-\s]?\d*/gi, 'ptl')
-      .replace(/nvl[-\s]?(u|h)?[-\s]?\d*/gi, 'nvl')
-      .replace(/next\s*gen|mainstream/gi, 'nextgen')
-      .replace(/purwa|mahua|kalambo/gi, v => v.toLowerCase())
-      .replace(/\s+/g, ' ').trim();
+    const s = (n || '').toLowerCase().replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+    // WCL (both HQ "Intel WCL-U/R" and Wistron "14"X360 Intel WCL")
+    if (/wcl/.test(s) && /intel/.test(s)) return 'intel_wcl';
+    // PTL
+    if (/ptl/.test(s) && /intel/.test(s)) return 'intel_ptl';
+    // NVL
+    if (/nvl/.test(s) && /intel/.test(s)) return 'intel_nvl';
+    // NextGen / Mainstream / Refresh
+    if (/next.?gen|mainstream|refresh/.test(s) && /intel/.test(s)) return 'intel_nextgen';
+    // Qualcomm group 1: Purwa/Mahua/Kalambo (without refresh)
+    if (/qualcomm/.test(s) && (/purwa|mahua|kalambo/.test(s)) && !/refresh/.test(s)) return 'qcom_main';
+    // Qualcomm group 2: refresh variants
+    if (/qualcomm/.test(s) && /refresh/.test(s)) return 'qcom_refresh';
+    // Qualcomm generic
+    if (/qualcomm/.test(s)) return 'qcom_other';
+    return s;
   }
 
   function renderFuncCert(data1, data2, sheetName, nameA, nameB) {
