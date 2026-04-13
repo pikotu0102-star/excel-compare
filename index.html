@@ -513,8 +513,11 @@
       ${common.length === 0 ? '<div class="sheet-note sheet-note-red">❌ 兩個檔案沒有共同工作表，無法比對</div>' : `<div class="sheet-note" style="color:#a78bfa;background:rgba(139,92,246,.1)">✔ 共同工作表：${common.length} 個</div>`}
     `;
     document.getElementById('sheetSummaryEl').classList.remove('hidden');
+    const HIDE_SHEETS = /^(tooling-|nre cpc tracker)/i;
     const sel = document.getElementById('sheetSelect');
-    sel.innerHTML = common.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+    sel.innerHTML = common
+      .filter(s => !HIDE_SHEETS.test(s.trim()))
+      .map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
     document.getElementById('sheetSelectorEl').classList.toggle('hidden', common.length === 0);
     document.getElementById('compareBtn').disabled = common.length === 0;
   }
