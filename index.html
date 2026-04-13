@@ -1162,6 +1162,95 @@
     }
     return platforms;
   }
+  function parseToolingSheet(data) {
+    const PLAT_KW = /flip|pav|envy|marina|titop|\d{2}[\u201d"]/i;
+    const CHASSIS_KW = /estimated.*monthly|monthly.*chassis/i;
+    const NRE_TOTAL_KW = /^nre\s*total/i;
+    const TOOL_MOD_KW = /^tooling\s*modification/i;
+    const ITEM_KW = /^(set of \d|\.\.\.)/i;
+    const result = { grandTotal: null, platforms: [] };
+    for (const row of data) {
+      const s0 = String(row[0] != null ? row[0] : '').trim();
+      if (/^total tooling/i.test(s0)) {
+        result.grandTotal = { toolingHP: parseNum(row[5]), toolingODM: parseNum(row[6]), toolingTotal: parseNum(row[7]) };
+        break;
+      }
+    }
+    let curPlat = null, inItems = false;
+    for (let r = 0; r < data.length; r++) {
+      const row = data[r] || [];
+      const s0 = String(row[0] != null ? row[0] : '').trim();
+      const col3 = row[3] != null ? row[3] : '';
+      const isPlatHeader = s0 && PLAT_KW.test(s0) && !CHASSIS_KW.test(s0) && !NRE_TOTAL_KW.test(s0) && !ITEM_KW.test(s0) && !TOOL_MOD_KW.test(s0) && !/^(tooling|certification|functional|item|total|nre|note|name|set)/i.test(s0) && (col3 === '' || col3 == null);
+      if (isPlatHeader) {
+        if (curPlat) result.platforms.push(curPlat);
+        curPlat = { name: s0, chassisQty: null, toolSets: [], toolingOriginal: null, toolingTotal: null, certOriginal: null, certTotal: null, funcCertOriginal: null, funcCertTotal: null, nreTotal: null };
+        inItems = false; continue;
+      }
+      if (!curPlat) continue;
+      if (CHASSIS_KW.test(s0)) { curPlat.chassisQty = parseNum(row[3]); continue; }
+      if (/^item$/i.test(s0)) { inItems = true; continue; }
+      if (TOOL_MOD_KW.test(s0)) { inItems = false; continue; }
+      if (inItems && ITEM_KW.test(s0)) {
+        curPlat.toolSets.push({ label: s0, original: parseNum(row[3]), hpShare: String(row[4] != null ? row[4] : '').trim(), total: parseNum(row[5]) });
+        continue;
+      }
+      if (!inItems) {
+        if (/^tooling$/i.test(s0)) { curPlat.toolingOriginal = parseNum(row[3]); curPlat.toolingTotal = parseNum(row[5]); }
+        else if (/^certification$/i.test(s0)) { curPlat.certOriginal = parseNum(row[3]); curPlat.certTotal = parseNum(row[5]); }
+        else if (/^functional\s*certification/i.test(s0)) { curPlat.funcCertOriginal = parseNum(row[3]); curPlat.funcCertTotal = parseNum(row[5]); }
+        else if (NRE_TOTAL_KW.test(s0)) { curPlat.nreTotal = parseNum(row[5]); }
+      }
+    }
+    if (curPlat) result.platforms.push(curPlat);
+    return result;
+  }
+
+  function renderTooling(data1, data2, sheetName, nameA, nameB) {
+    const resA = parseToolingSheet(data1);
+    const resB = parseToolingSheet(data2);
+    function normPlat(n) { return (n||'').toLowerCase().replace(/\s+/g,' ').trim(); }
+    const mapB = new Map(resB.platforms.map(p => [normPlat(p.name), p]));
+    const allPlatNames = [...new Set([...resA.platforms.map(p=>p.name), ...resB.platforms.map(p=>p.name)])];
+    const fmtN = v => (v===null||v===undefined) ? '—' : Number(v).toLocaleString('zh-TW',{minimumFractionDigits:0,maximumFractionDigits:0});
+    const diffCls = (a,b) => { if(a===null||b===null) return ''; const d=a-b; return d>0?'diff-up':d<0?'diff-down':'diff-zero'; };
+    const fmtDiffN = (a,b) => { if(a===null||b===null) return '—'; const d=a-b; return (d>0?'+':'')+d.toLocaleString('zh-TW',{minimumFractionDigits:0,maximumFractionDigits:0}); };
+    const gtA = resA.grandTotal||{}, gtB = resB.grandTotal||{};
+    const gtRows = [['Total Tooling (HP Share)',gtA.toolingHP,gtB.toolingHP],['Total Tooling (ODM Share)',gtA.toolingODM,gtB.toolingODM],['Total Tooling',gtA.toolingTotal,gtB.toolingTotal]];
+    let gtTbody = '';
+    for (const [label,a,b] of gtRows) {
+      gtTbody += `<tr><td style="font-family:'Noto Sans TC',sans-serif;color:#cbd5e1">${esc(label)}</td><td class="${a!==b?'rd-cell-diff-a':''}">${esc(fmtN(a))}</td><td class="${a!==b?'rd-cell-diff-b':''}">${esc(fmtN(b))}</td><td class="${diffCls(a,b)}">${esc(fmtDiffN(a,b))}</td></tr>`;
+    }
+    const gtHtml = `<div class="section" style="padding:16px 20px;"><div class="section-title">🏁 Grand Total 比較</div><table class="rd-table" style="max-width:700px"><thead><tr><th>項目</th><th class="rd-th-a">${esc(nameA)}</th><th class="rd-th-b">${esc(nameB)}</th><th style="color:#fbbf24">差異</th></tr></thead><tbody>${gtTbody}</tbody></table></div>`;
+    let platHtml = '';
+    for (const platName of allPlatNames) {
+      const pA = resA.platforms.find(p=>normPlat(p.name)===normPlat(platName));
+      const pB = mapB.get(normPlat(platName));
+      const fields = [['Tooling Original',pA?.toolingOriginal,pB?.toolingOriginal],['Tooling (HP Share)',pA?.toolingTotal,pB?.toolingTotal],['Certification Original',pA?.certOriginal,pB?.certOriginal],['Certification (HP Share)',pA?.certTotal,pB?.certTotal],['Functional Cert. Original',pA?.funcCertOriginal,pB?.funcCertOriginal],['Functional Cert. (HP Share)',pA?.funcCertTotal,pB?.funcCertTotal],['NRE Total (HP Share)',pA?.nreTotal,pB?.nreTotal]];
+      const hasDiff = fields.some(([,a,b])=>a!==b&&!(a===null&&b===null));
+      const allSetLabels=[...new Set([...(pA?.toolSets||[]).map(s=>s.label),...(pB?.toolSets||[]).map(s=>s.label)])];
+      const mapSetB=new Map((pB?.toolSets||[]).map(s=>[s.label,s]));
+      let toolSetRows='';
+      for(const lbl of allSetLabels){
+        const sA=(pA?.toolSets||[]).find(s=>s.label===lbl);
+        const sB=mapSetB.get(lbl);
+        const diff=(sA?.original)!==(sB?.original);
+        toolSetRows+=`<tr style="${diff?'background:rgba(251,191,36,.08)':''}"><td style="font-family:'Noto Sans TC',sans-serif;color:#94a3b8;padding-left:20px">${esc(lbl)}</td><td class="${diff&&sA&&sB?'rd-cell-diff-a':''}">${esc(fmtN(sA?.original??null))}</td><td>${esc(sA?.hpShare||'—')}</td><td class="${diff&&sA&&sB?'rd-cell-diff-a':''}">${esc(fmtN(sA?.total??null))}</td><td class="${diff&&sA&&sB?'rd-cell-diff-b':''}">${esc(fmtN(sB?.original??null))}</td><td>${esc(sB?.hpShare||'—')}</td><td class="${diff&&sA&&sB?'rd-cell-diff-b':''}">${esc(fmtN(sB?.total??null))}</td></tr>`;
+      }
+      let sumTbody='';
+      for(const [label,a,b] of fields){
+        sumTbody+=`<tr ${a!==b&&!(a===null&&b===null)?'class="rd-row-diff"':''}><td style="font-family:'Noto Sans TC',sans-serif;color:#cbd5e1">${esc(label)}</td><td class="${a!==b&&a!==null&&b!==null?'rd-cell-diff-a':''}">${esc(fmtN(a))}</td><td class="${a!==b&&a!==null&&b!==null?'rd-cell-diff-b':''}">${esc(fmtN(b))}</td><td class="${diffCls(a,b)}">${esc(fmtDiffN(a,b))}</td></tr>`;
+      }
+      const badge = !pA?`<span class="badge badge-added">${esc(nameB)} 獨有</span>`:!pB?`<span class="badge badge-removed">${esc(nameA)} 獨有</span>`:hasDiff?'<span class="badge badge-changed">有差異</span>':'<span class="badge" style="background:rgba(52,211,153,.15);color:#34d399">✓ 一致</span>';
+      platHtml+=`<div class="section" style="padding:0;margin-bottom:16px;"><div style="padding:10px 18px;font-weight:700;font-size:.95rem;color:#a78bfa;border-bottom:1px solid rgba(255,255,255,.07);display:flex;justify-content:space-between;align-items:center;"><span>📦 ${esc(platName)}</span>${badge}</div><div style="padding:12px 18px;display:flex;gap:24px;font-size:.8rem;color:#64748b;border-bottom:1px solid rgba(255,255,255,.04)"><span>${esc(nameA)} Chassis/月：<strong style="color:#60a5fa">${esc(fmtN(pA?.chassisQty??null))}</strong></span><span>${esc(nameB)} Chassis/月：<strong style="color:#34d399">${esc(fmtN(pB?.chassisQty??null))}</strong></span></div><div style="padding:12px 18px;overflow-x:auto"><table class="rd-table" style="min-width:600px;margin-bottom:12px"><thead><tr><th rowspan="2" style="text-align:left;min-width:160px">Tool Set</th><th colspan="3" class="rd-th-a">${esc(nameA)}</th><th colspan="3" class="rd-th-b">${esc(nameB)}</th></tr><tr><th class="rd-th-a">Original</th><th class="rd-th-a">HP%</th><th class="rd-th-a">HP Total</th><th class="rd-th-b">Original</th><th class="rd-th-b">HP%</th><th class="rd-th-b">HP Total</th></tr></thead><tbody>${toolSetRows}</tbody></table><table class="rd-table" style="max-width:700px"><thead><tr><th style="text-align:left">Summary</th><th class="rd-th-a">${esc(nameA)}</th><th class="rd-th-b">${esc(nameB)}</th><th style="color:#fbbf24">差異</th></tr></thead><tbody>${sumTbody}</tbody></table></div></div>`;
+    }
+    const diffPlatCount=allPlatNames.filter(n=>{const pA=resA.platforms.find(p=>normPlat(p.name)===normPlat(n));const pB=mapB.get(normPlat(n));if(!pA||!pB)return true;return[pA.toolingTotal,pA.certTotal,pA.funcCertTotal,pA.nreTotal].some((v,i)=>v!==[pB.toolingTotal,pB.certTotal,pB.funcCertTotal,pB.nreTotal][i]);}).length;
+    const html=`<div class="stats-row"><div class="stat-card"><div class="stat-number">${resA.platforms.length}</div><div class="stat-label">${esc(nameA)} 平台數</div></div><div class="stat-card"><div class="stat-number">${resB.platforms.length}</div><div class="stat-label">${esc(nameB)} 平台數</div></div><div class="stat-card"><div class="stat-number" style="color:#fbbf24">${diffPlatCount}</div><div class="stat-label">有差異平台</div></div></div>${gtHtml}<div style="font-size:.85rem;font-weight:600;color:#94a3b8;margin:0 0 12px;padding:0 4px">📋 各平台明細</div>${platHtml}`;
+    const el=document.getElementById('results');
+    el.innerHTML=html;
+    el.classList.remove('hidden');
+  }
+
   // ── 生成 Raw Table（fallback 或 debug 用）────────────────────
   function renderRdRawTable(data, title) {
     const PLAT_KW = /intel|qualcomm|wcl|ptl|nvl|purwa|flip|marina/i;
