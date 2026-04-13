@@ -415,11 +415,11 @@
   <div class="name-grid hidden" id="nameGridEl">
     <div class="name-input-wrap">
       <label class="name-input-label">📝 檔案 A 自訂名稱</label>
-      <input type="text" id="customName1" class="name-input" placeholder="例：HQ版本" value="檔案A">
+      <input type="text" id="customName1" class="name-input" placeholder="例：HQ版本" value="檔案A" oninput="updateSheetUI()">
     </div>
     <div class="name-input-wrap">
       <label class="name-input-label">📝 檔案 B 自訂名稱</label>
-      <input type="text" id="customName2" class="name-input" placeholder="例：Wistron版本" value="檔案B">
+      <input type="text" id="customName2" class="name-input" placeholder="例：Wistron版本" value="檔案B" oninput="updateSheetUI()">
     </div>
   </div>
 
@@ -499,12 +499,12 @@
     const chips = (arr, cls) => arr.map(s => `<span class="sheet-chip ${cls}">${esc(s)}</span>`).join('');
     document.getElementById('sheetSummaryInner').innerHTML = `
       <div class="sheet-group">
-        <span class="sheet-group-label">📁 檔案 A（${s1.length} 個工作表）</span>
+        <span class="sheet-group-label">📁 ${document.getElementById('customName1')?.value?.trim()||'檔案A'}（${s1.length} 個工作表）</span>
         ${chips(s1.filter(s => common.includes(s)), 'chip-common')}
         ${chips(aOnly, 'chip-a-only')}
       </div>
       <div class="sheet-group">
-        <span class="sheet-group-label">📁 檔案 B（s2.length} 個工作表）</span>
+        <span class="sheet-group-label">📁 ${document.getElementById('customName2')?.value?.trim()||'檔案B'}（${s2.length} 個工作表）</span>
         ${chips(s2.filter(s => common.includes(s)), 'chip-common')}
         ${chips(bOnly, 'chip-b-only')}
       </div>
